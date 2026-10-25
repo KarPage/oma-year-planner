@@ -1,0 +1,985 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Year planner</title>
+  <meta name="theme-color" content="#000d04">
+  <link rel="manifest" href="manifest.webmanifest">
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #000d04;
+      --bg-raised: #171f1a;
+      --bg-deep: #000300;
+      --fg: #fcfff4;
+      --fg-dim: #d1d4ca;
+      --muted: #545754;
+      --accent: #41a468;
+      --travel: #74a869;
+      --work: #37a388;
+      --personal: #c0d1a4;
+      --other: #54bda1;
+      --sun: #e4b0a4;
+      --range: #e6d48a;
+      --danger: #c47868;
+      --handle: #f4efe2;
+      --line: color-mix(in srgb, var(--fg) 12%, transparent);
+      --line-strong: color-mix(in srgb, var(--fg) 28%, transparent);
+      --font: "iA Writer Quattro S", "iA Writer Duo S", sans-serif;
+      --mono: "iA Writer Mono S", ui-monospace, monospace;
+    }
+
+    * { box-sizing: border-box; }
+    button, input, dialog { border-radius: 0; }
+
+    html, body {
+      margin: 0;
+      height: 100%;
+      background: var(--bg);
+      color: var(--fg);
+      font-family: var(--font);
+      font-size: 14px;
+    }
+
+    body {
+      min-height: 100%;
+      display: flex;
+      flex-direction: column;
+      padding: 8px 0 4px;
+      gap: 8px;
+    }
+
+    .top, .intro, .tools, .foot { padding-left: 12px; padding-right: 12px; }
+
+    button, input { font: inherit; color: inherit; accent-color: var(--accent); }
+    ::selection { background: var(--accent); color: var(--bg); }
+    button { cursor: pointer; }
+    button:focus-visible, input:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
+
+    .top {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .brand { display: flex; align-items: center; gap: 14px; min-width: 0; }
+    .mark {
+      width: 28px;
+      height: 28px;
+      color: var(--accent);
+      flex: none;
+    }
+    .eyebrow {
+      margin: 0;
+      color: var(--muted);
+      font-family: var(--mono);
+      font-size: 10px;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+    }
+    h1.today-headline {
+      margin: 0;
+      min-width: 0;
+      font-size: inherit;
+      font-weight: inherit;
+      letter-spacing: inherit;
+      line-height: inherit;
+    }
+    .today-headline button {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 2px;
+      max-width: 100%;
+      padding: 0;
+      border: 0;
+      background: transparent;
+      text-align: left;
+      cursor: pointer;
+    }
+    .today-kicker {
+      color: var(--accent);
+      font-family: var(--mono);
+      font-size: 11px;
+      font-weight: 650;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+    }
+    .today-line {
+      font-size: 34px;
+      font-weight: 650;
+      letter-spacing: -0.045em;
+      line-height: 0.95;
+      color: var(--fg);
+    }
+
+    .nav { display: flex; align-items: center; gap: 8px; }
+    .year-num {
+      min-width: 5ch;
+      text-align: center;
+      font-size: 28px;
+      font-weight: 600;
+      letter-spacing: -0.04em;
+      font-variant-numeric: tabular-nums;
+    }
+    .icon-btn, .ghost {
+      height: 36px;
+      border: 1px solid var(--line-strong);
+      background: transparent;
+      color: var(--fg);
+    }
+    .icon-btn { width: 36px; padding: 0; }
+    .ghost { padding: 0 14px; }
+    .icon-btn:hover, .ghost:hover, .backup button:hover {
+      background: color-mix(in srgb, var(--fg) 8%, transparent);
+    }
+
+    .primary {
+      justify-self: end;
+      height: 40px;
+      padding: 0 16px;
+      border: 0;
+      background: var(--accent);
+      color: var(--bg);
+      font-weight: 600;
+    }
+    .primary:hover { filter: brightness(1.08); }
+
+    .intro {
+      display: block;
+      width: 100%;
+      padding: 12px 16px 14px;
+      border-top: 1px solid var(--line);
+      border-bottom: 1px solid var(--line);
+      background: color-mix(in srgb, var(--fg) 3%, transparent);
+    }
+    .hud {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: flex-end;
+      justify-content: center;
+      gap: 14px 20px;
+      width: 100%;
+    }
+    .clocks {
+      display: flex;
+      flex: 1 1 100%;
+      flex-wrap: wrap;
+      align-items: flex-end;
+      justify-content: center;
+      gap: 14px 28px;
+      min-width: 0;
+    }
+    .since-clock,
+    .next-clock {
+      flex: 0 0 auto;
+      max-width: 100%;
+    }
+    .clock { display: flex; flex-direction: column; gap: 3px; }
+    .clock .kicker {
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+    .clock .readout {
+      display: flex;
+      align-items: baseline;
+      gap: 12px;
+      font-family: var(--mono);
+      font-variant-numeric: tabular-nums;
+      line-height: 1;
+    }
+    .clock .days { font-size: 28px; font-weight: 700; letter-spacing: -0.04em; }
+    .clock .days small { margin-left: 4px; font-size: 11px; font-weight: 500; color: var(--muted); }
+    .clock .hms { font-size: 16px; font-weight: 500; letter-spacing: 0.06em; }
+    .clock .who { font-size: 12px; color: var(--fg-dim); }
+    .clock.since .days { color: var(--fg); }
+    .clock.since .hms { color: #c47868; }
+    .clocks .empty { margin: 0; color: var(--muted); font-size: 13px; }
+    .next-clock {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 2px;
+      padding: 0;
+      border: 0;
+      background: transparent;
+      color: inherit;
+      text-align: center;
+      cursor: pointer;
+    }
+    .next-clock .kicker {
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--accent);
+    }
+    .since-clock .kicker { color: #e4b0a4; }
+    .next-clock .who {
+      font-size: 15px;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      color: var(--fg);
+    }
+    .next-clock .face {
+      display: flex;
+      align-items: flex-end;
+      gap: 5px;
+    }
+    .next-clock .unit {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-width: 44px;
+      padding: 6px 7px 5px;
+      border: 1px solid color-mix(in srgb, var(--accent) 32%, transparent);
+      background: color-mix(in srgb, var(--accent) 7%, transparent);
+    }
+    .next-clock .unit.days {
+      min-width: 64px;
+      border-color: color-mix(in srgb, var(--accent) 70%, transparent);
+    }
+    .next-clock .unit b {
+      font-family: var(--mono);
+      font-size: 18px;
+      font-weight: 600;
+      line-height: 1;
+      color: var(--accent);
+      font-variant-numeric: tabular-nums;
+    }
+    .next-clock .unit.days b { font-size: 28px; font-weight: 700; }
+    .next-clock .unit span {
+      margin-top: 5px;
+      font-size: 9px;
+      font-weight: 600;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+    .next-clock .sep {
+      padding-bottom: 16px;
+      font-family: var(--mono);
+      font-size: 18px;
+      line-height: 1;
+      color: color-mix(in srgb, var(--accent) 70%, transparent);
+    }
+    .since-clock .unit {
+      border-color: color-mix(in srgb, #e4b0a4 34%, transparent);
+      background: color-mix(in srgb, #e4b0a4 8%, transparent);
+    }
+    .since-clock .unit.days { border-color: color-mix(in srgb, #e4b0a4 72%, transparent); }
+    .since-clock .unit b,
+    .since-clock .sep { color: #e4b0a4; }
+    .next-clock:hover .unit { background: color-mix(in srgb, var(--accent) 14%, transparent); }
+    .since-clock:hover .unit { background: color-mix(in srgb, #e4b0a4 16%, transparent); }
+
+    .hud-side {
+      display: flex;
+      flex: 1 1 100%;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+    }
+    .stats { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px; }
+    .stat-box {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-width: 76px;
+      min-height: 64px;
+      padding: 8px 10px 6px;
+      border: 1px solid var(--line-strong);
+      background: color-mix(in srgb, var(--fg) 4%, transparent);
+    }
+    .stat-box b {
+      font-family: var(--mono);
+      font-size: 22px;
+      font-weight: 600;
+      line-height: 1;
+      color: var(--fg);
+      font-variant-numeric: tabular-nums;
+    }
+    .stat-box span {
+      margin-top: 6px;
+      max-width: 9em;
+      font-size: 9px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      text-align: center;
+      line-height: 1.2;
+      color: var(--muted);
+    }
+
+    .tools { display: flex; align-items: center; justify-content: flex-end; gap: 16px; }
+    .filters { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      height: 32px;
+      padding: 0 10px;
+      border: 1px solid transparent;
+      background: transparent;
+      color: var(--fg-dim);
+    }
+    .chip[aria-pressed="true"] {
+      border-color: var(--line-strong);
+      color: var(--fg);
+    }
+    .dot { width: 8px; height: 8px; background: var(--dot, var(--muted)); }
+
+    .search {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex: 1 1 220px;
+      width: auto;
+      min-width: 180px;
+      max-width: 320px;
+      height: 64px;
+      margin: 0;
+      padding: 0 12px;
+      color: var(--muted);
+      border: 1px solid var(--line-strong);
+      background: var(--bg);
+    }
+    .search:focus-within {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+    .search svg { flex: none; }
+    .search input {
+      width: 100%;
+      min-width: 0;
+      height: 100%;
+      border: 0;
+      background: transparent;
+      padding: 0;
+      outline: none;
+      color: var(--fg);
+      font-size: 14px;
+    }
+    .search input::placeholder { color: var(--muted); }
+
+    .rhythm {
+      flex: 1 1 100%;
+      margin: 0;
+      text-align: center;
+      color: var(--fg-dim);
+      font-size: 15px;
+      letter-spacing: -0.01em;
+    }
+
+    .stage {
+      flex: 1;
+      min-height: 0;
+      position: relative;
+      display: flex;
+    }
+
+    .board {
+      flex: 1;
+      min-width: 0;
+      min-height: 0;
+      overflow: auto;
+      container-type: size;
+      scroll-padding-top: 26px;
+      border-top: 1px solid var(--line-strong);
+      border-bottom: 1px solid var(--line-strong);
+      background: color-mix(in srgb, var(--bg-raised) 35%, var(--bg));
+    }
+
+    .calendar {
+      --head: 26px;
+      --month-h: calc((100cqh - var(--head)) / 12);
+      display: grid;
+      grid-template-columns: 4.4rem repeat(31, minmax(0, 1fr)) 2.6rem;
+      grid-auto-rows: auto;
+      width: 100%;
+      min-width: 0;
+      font-family: var(--mono);
+      user-select: none;
+    }
+
+    .corner, .daynum, .month, .cell {
+      border-right: 1px solid color-mix(in srgb, var(--fg) 16%, transparent);
+      border-bottom: 1px solid color-mix(in srgb, var(--fg) 16%, transparent);
+    }
+    .corner, .daynum, .away-head {
+      display: grid;
+      place-items: center;
+      letter-spacing: 0;
+      text-transform: uppercase;
+      min-width: 0;
+      overflow: hidden;
+      background: color-mix(in srgb, var(--accent) 9%, var(--bg));
+    }
+    .dayhead {
+      position: sticky;
+      top: 0;
+      z-index: 8;
+      height: var(--head);
+    }
+    .corner { z-index: 2; color: var(--muted); font-size: 10px; font-weight: 500; }
+    .daynum { color: var(--fg); font-size: 11px; font-weight: 600; }
+    .daynum.today {
+      color: var(--accent);
+      box-shadow: inset 0 -2px 0 var(--accent);
+    }
+    .daynum.picked {
+      color: var(--bg);
+      background: var(--accent);
+      box-shadow: none;
+    }
+    .month {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      justify-content: center;
+      gap: 1px;
+      min-width: 0;
+      padding: 0 8px;
+      border-right: 1px solid var(--line-strong);
+      z-index: 2;
+      background: color-mix(in srgb, var(--sun) 8%, var(--bg));
+    }
+    .month .num { color: var(--sun); font-size: 10px; font-weight: 600; letter-spacing: 0.08em; }
+    .month .name { color: var(--fg); font-size: 15px; font-weight: 700; font-family: var(--font); line-height: 1; }
+    .month.now {
+      background: color-mix(in srgb, var(--accent) 16%, var(--bg));
+    }
+    .month.now .name, .month.now .num { color: var(--accent); }
+
+    .cell, .month, .month-total { min-width: 0; height: var(--month-h); }
+    .cell { position: relative; overflow: hidden; }
+    .cell[data-date] { cursor: pointer; touch-action: none; }
+    .year-divider {
+      grid-column: 1 / -1;
+      height: 22px;
+      display: flex;
+      align-items: center;
+      padding: 0 12px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      font-size: 11px;
+      font-weight: 650;
+      color: var(--accent);
+      background: color-mix(in srgb, var(--accent) 14%, var(--bg));
+      border-bottom: 1px solid color-mix(in srgb, var(--fg) 16%, transparent);
+    }
+    .month-total {
+      display: grid;
+      place-items: center;
+      font-size: 11px;
+      font-weight: 650;
+      color: var(--accent);
+      border-bottom: 1px solid color-mix(in srgb, var(--fg) 16%, transparent);
+      border-left: 1px solid var(--line-strong);
+    }
+    .month-total.zero { color: var(--muted); font-weight: 500; }
+    .cell.weekend { background: color-mix(in srgb, var(--sun) 8%, transparent); }
+    .cell.past { background: color-mix(in srgb, var(--bg-deep) 28%, transparent); }
+    .cell.past .wd { color: var(--muted); }
+    .cell.today::after {
+      content: "";
+      position: absolute;
+      z-index: 4;
+      top: 0;
+      bottom: 0;
+      left: calc(50% - 1px);
+      width: 2px;
+      background: var(--accent);
+      pointer-events: none;
+    }
+    .cell.focus { box-shadow: inset 0 0 0 2px var(--accent); }
+    .cell[data-date]:hover { background: color-mix(in srgb, var(--fg) 5%, transparent); }
+    .cell.drop { background: color-mix(in srgb, var(--accent) 28%, transparent); }
+    .cell.today { background: color-mix(in srgb, var(--accent) 22%, transparent); }
+    .cell.picked {
+      background: color-mix(in srgb, var(--accent) 18%, transparent);
+      box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 60%, transparent);
+    }
+    .cell.follow,
+    .cell.range {
+      background: color-mix(in srgb, var(--range) 16%, transparent);
+      box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--range) 42%, transparent);
+    }
+    .cell.void {
+      background: color-mix(in srgb, var(--bg-deep) 72%, transparent);
+      cursor: default;
+    }
+    .wd {
+      z-index: 3;
+      align-self: start;
+      justify-self: center;
+      margin-top: 3px;
+      font-size: 11px;
+      font-weight: 500;
+      line-height: 1;
+      letter-spacing: 0;
+      white-space: nowrap;
+      color: color-mix(in srgb, var(--fg) 78%, transparent);
+      pointer-events: none;
+    }
+    .wd.today { color: var(--accent); font-weight: 700; }
+    .wd.sun { color: var(--sun); font-weight: 700; }
+
+    .bar {
+      z-index: 1;
+      position: relative;
+      container-type: size;
+      min-width: 0;
+      min-height: 0;
+      align-self: stretch;
+      height: auto;
+      margin: 0 1px;
+      padding: 0;
+      border: 0;
+      background: transparent;
+      color: var(--fg);
+      pointer-events: none;
+      overflow: hidden;
+    }
+    .fill {
+      pointer-events: auto;
+      cursor: grab;
+      position: absolute;
+      left: 1px;
+      right: 1px;
+      top: calc(14px + (100% - 16px) * (var(--lane) + 0.1) / var(--lanes));
+      height: calc((100% - 16px) / var(--lanes) * 0.8);
+      min-height: 0;
+      display: flex;
+      align-items: center;
+      padding: 0 16px;
+      border: 1px solid color-mix(in srgb, var(--cat, var(--accent)) 46%, transparent);
+      background: color-mix(in srgb, var(--cat, var(--accent)) 24%, transparent);
+      font-family: var(--font);
+      font-size: clamp(8px, 46cqh, 13px);
+      line-height: 1.1;
+      text-align: left;
+      overflow: hidden;
+    }
+    .fill .label {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      min-width: 0;
+    }
+    .fill .count { flex: none; opacity: 0.85; }
+    .fill .edge { flex: none; font-weight: 700; }
+    @container (max-width: 5.5rem) {
+      .fill .count { display: none; }
+    }
+    .bar.cont-before .fill {
+      mask-image: linear-gradient(to right, transparent, #000 14px);
+    }
+    .bar.cont-after .fill {
+      mask-image: linear-gradient(to left, transparent, #000 14px);
+    }
+    .bar.cont-before.cont-after .fill {
+      mask-image: linear-gradient(to right, transparent, #000 14px, #000 calc(100% - 14px), transparent);
+    }
+    .fill.single { padding: 0 4px; }
+    .fill.single .label {
+      white-space: normal;
+      display: -webkit-box;
+      -webkit-line-clamp: 3;
+      -webkit-box-orient: vertical;
+      line-height: 1.1;
+    }
+    .bar:hover .fill { filter: brightness(1.12); }
+    .bar.selected .fill {
+      border-color: var(--fg);
+      border-width: 2px;
+      background: color-mix(in srgb, var(--cat, var(--accent)) 36%, transparent);
+    }
+    .bar.lifting .fill { opacity: 0.45; }
+    .handle {
+      position: absolute;
+      top: 50%;
+      width: 5px;
+      height: 16px;
+      margin-top: -8px;
+      cursor: ew-resize;
+      background: var(--handle);
+      box-shadow: 0 0 0 1px var(--danger);
+    }
+    .handle.w { left: 4px; }
+    .handle.e { right: 4px; }
+    .bar.selected .handle { height: 22px; margin-top: -11px; background: var(--handle); box-shadow: 0 0 0 1px var(--danger); }
+    .plan-tools {
+      display: none;
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      gap: 3px;
+      z-index: 4;
+      pointer-events: auto;
+    }
+    .board.show-tools .bar.selected .plan-tools { display: flex; }
+    .plan-tools button {
+      width: 22px;
+      height: 22px;
+      display: grid;
+      place-items: center;
+      padding: 0;
+      border: 1px solid color-mix(in srgb, var(--fg) 35%, transparent);
+      background: color-mix(in srgb, var(--bg) 82%, transparent);
+      color: var(--fg);
+    }
+    .plan-tools button:hover { border-color: var(--accent); color: var(--accent); }
+    .plan-tools button.danger:hover { border-color: var(--danger); color: var(--danger); }
+
+    .action {
+      position: fixed;
+      z-index: 30;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      max-width: calc(100% - 24px);
+      padding: 8px 8px 8px 14px;
+      border: 1px solid var(--line-strong);
+      background: color-mix(in srgb, var(--bg-raised) 88%, var(--bg));
+      box-shadow: 0 10px 30px color-mix(in srgb, var(--bg-deep) 65%, transparent);
+    }
+    .action[hidden] { display: none; }
+    .action p { margin: 0; font-size: 13px; white-space: nowrap; }
+    .action-buttons { display: flex; gap: 6px; }
+    .action .primary, .action .ghost, .action .icon-btn { height: 32px; justify-self: auto; }
+    .action .icon-btn {
+      width: 32px;
+      display: grid;
+      place-items: center;
+      padding: 0;
+    }
+    .action .icon-btn svg { display: block; }
+    .foot {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      min-height: 28px;
+    }
+    .status-row { display: flex; align-items: center; gap: 14px; min-width: 0; }
+    #status { margin: 0; color: var(--muted); font-size: 12px; }
+    #undo {
+      height: 28px;
+      padding: 0 10px;
+      border: 1px solid var(--line-strong);
+      background: transparent;
+      color: var(--accent);
+      font-size: 13px;
+      font-weight: 600;
+    }
+    #undo[hidden] { display: none; }
+    .backup { display: flex; gap: 14px; margin-left: auto; }
+    .backup button {
+      border: 0;
+      background: transparent;
+      color: var(--fg-dim);
+      padding: 4px 0;
+      font-size: 13px;
+    }
+
+    dialog {
+      width: min(640px, calc(100vw - 48px));
+      padding: 0;
+      border: 1px solid var(--line-strong);
+      background: var(--bg);
+      color: var(--fg);
+    }
+    dialog::backdrop { background: color-mix(in srgb, var(--bg-deep) 78%, transparent); }
+    form { display: flex; flex-direction: column; gap: 22px; padding: 32px; }
+    dialog h3 { margin: 0; font-size: 28px; letter-spacing: -0.03em; }
+    label { display: flex; flex-direction: column; gap: 8px; font-size: 15px; color: var(--accent); }
+    input[type="text"], input[type="date"] {
+      height: 48px;
+      border: 1px solid var(--line-strong);
+      background: var(--bg-raised);
+      padding: 0 14px;
+      color: var(--fg);
+      font-size: 16px;
+    }
+    .dates { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+    .tag-fields {
+      display: grid;
+      grid-template-columns: 1fr 140px;
+      gap: 18px;
+      align-items: end;
+    }
+    input[type="color"] {
+      width: 100%;
+      height: 48px;
+      padding: 6px;
+      border: 1px solid var(--line-strong);
+      background: var(--bg-raised);
+    }
+    textarea {
+      min-height: 120px;
+      resize: vertical;
+      border: 1px solid var(--line-strong);
+      background: var(--bg-raised);
+      color: var(--fg);
+      padding: 12px 14px;
+      font: inherit;
+      font-size: 16px;
+      line-height: 1.4;
+    }
+    .note-tools { display: flex; align-items: center; gap: 10px; }
+    .note-tools .ghost { height: 36px; }
+    .note-images, .note-card .shots { display: flex; flex-wrap: wrap; gap: 8px; }
+    .shot {
+      position: relative;
+      width: 96px;
+      height: 72px;
+      border: 1px solid var(--line-strong);
+      background: var(--bg-deep);
+      padding: 0;
+    }
+    .shot img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .shot .remove {
+      position: absolute;
+      top: 0;
+      right: 0;
+      width: 22px;
+      height: 22px;
+      border: 0;
+      background: var(--bg);
+      color: var(--fg);
+    }
+    .note-card {
+      position: absolute;
+      z-index: 20;
+      width: min(380px, calc(100% - 16px));
+      border: 1px solid var(--line-strong);
+      background: var(--bg);
+      box-shadow: 0 18px 40px color-mix(in srgb, #000 45%, transparent);
+    }
+    .note-card[hidden] { display: none; }
+    .note-card::before {
+      content: "";
+      position: absolute;
+      top: -6px;
+      left: var(--arrow, 24px);
+      width: 10px;
+      height: 10px;
+      background: var(--bg);
+      border-left: 1px solid var(--line-strong);
+      border-top: 1px solid var(--line-strong);
+      transform: rotate(45deg);
+    }
+    .note-card.above::before {
+      top: auto;
+      bottom: -6px;
+      border-left: 0;
+      border-top: 0;
+      border-right: 1px solid var(--line-strong);
+      border-bottom: 1px solid var(--line-strong);
+    }
+    .note-sheet { display: flex; flex-direction: column; }
+    .note-card p {
+      margin: 0;
+      padding: 14px 16px;
+      text-align: left;
+      white-space: pre-wrap;
+      font-size: 15px;
+      font-weight: 600;
+      line-height: 1.4;
+    }
+    .note-card a { color: var(--accent); }
+    .note-card .shots { display: flex; flex-direction: column; }
+    .note-card .shot {
+      width: 100%;
+      height: auto;
+      max-height: none;
+      border: 0;
+      border-top: 1px solid var(--line);
+      background: var(--bg-deep);
+    }
+    .note-card .shot img {
+      display: block;
+      width: 100%;
+      height: auto;
+      max-width: 100%;
+      max-height: 320px;
+      object-fit: cover;
+    }
+    dialog { max-height: calc(100vh - 48px); overflow: auto; }
+    dialog.anchored { position: fixed; margin: 0; }
+    #help { width: min(440px, calc(100vw - 32px)); }
+    #help h3 { margin: 0 0 8px; }
+    #help ul { margin: 0; padding-left: 18px; }
+    #help li { margin: 6px 0; line-height: 1.4; }
+    #help kbd {
+      font-family: var(--mono);
+      font-size: 12px;
+      border: 1px solid var(--line-strong);
+      padding: 0 4px;
+    }
+    .ghost[aria-pressed="true"] {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+    .form-actions { display: flex; justify-content: flex-end; gap: 8px; }
+    #f-delete { margin-right: auto; }
+    #f-error { min-height: 1em; margin: 0; color: var(--personal); font-size: 12px; }
+  </style>
+  <link rel="stylesheet" href="theme.css">
+</head>
+<body>
+  <header class="top">
+    <div class="brand">
+      <svg class="mark" viewBox="0 0 28 28" aria-hidden="true">
+        <rect x="2" y="2" width="6.5" height="6.5" rx="0" fill="currentColor"/>
+        <rect x="10.75" y="2" width="6.5" height="6.5" rx="0" fill="currentColor" opacity="0.75"/>
+        <rect x="19.5" y="2" width="6.5" height="6.5" rx="0" fill="currentColor" opacity="0.5"/>
+        <rect x="2" y="10.75" width="6.5" height="6.5" rx="0" fill="currentColor" opacity="0.75"/>
+        <rect x="10.75" y="10.75" width="6.5" height="6.5" rx="0" fill="currentColor"/>
+        <rect x="19.5" y="10.75" width="6.5" height="6.5" rx="0" fill="currentColor" opacity="0.75"/>
+        <rect x="2" y="19.5" width="6.5" height="6.5" rx="0" fill="currentColor" opacity="0.5"/>
+        <rect x="10.75" y="19.5" width="6.5" height="6.5" rx="0" fill="currentColor" opacity="0.75"/>
+        <rect x="19.5" y="19.5" width="6.5" height="6.5" rx="0" fill="currentColor"/>
+      </svg>
+      <h1 class="today-headline">
+        <button id="today-title" type="button">
+          <span class="eyebrow">Year planner</span>
+          <span class="today-kicker" id="today-kicker">Today</span>
+          <span class="today-line" id="today-line"></span>
+        </button>
+      </h1>
+    </div>
+    <div class="nav">
+      <button class="icon-btn" id="prev" type="button" aria-label="Previous year">←</button>
+      <div class="year-num" id="year-label">2026</div>
+      <button class="icon-btn" id="next" type="button" aria-label="Next year">→</button>
+      <button class="ghost" id="today" type="button">Today</button>
+      <button class="ghost" id="rolling" type="button" aria-pressed="false">Rolling 12</button>
+      <button class="icon-btn" id="help-btn" type="button" aria-label="Help">?</button>
+    </div>
+    <button class="primary" id="add" type="button">+ Add plan</button>
+  </header>
+
+  <section class="intro">
+    <div class="hud">
+      <p class="rhythm" id="rhythm"></p>
+      <div class="hud-side">
+        <div class="stats" id="stats"></div>
+        <label class="search">
+          <svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true">
+            <circle cx="7" cy="7" r="4.25" fill="none" stroke="currentColor" stroke-width="1.4"/>
+            <path d="M10.4 10.4 L13.2 13.2" stroke="currentColor" stroke-width="1.4"/>
+          </svg>
+          <input id="q" type="search" placeholder="Search plans" autocomplete="off">
+        </label>
+      </div>
+    </div>
+  </section>
+
+  <div class="stage">
+    <div class="board" id="board"></div>
+    <div class="note-card" id="note-card" hidden></div>
+    <div class="action" id="action" hidden>
+      <p id="action-label"></p>
+      <div class="action-buttons">
+        <button class="primary" id="action-add" type="button">Add plan</button>
+        <button class="icon-btn" id="action-edit" type="button" aria-label="Edit plan" title="Edit plan">
+          <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
+            <path d="M2.5 11.8V13.5h1.7l7.4-7.4-1.7-1.7-7.4 7.4z" fill="none" stroke="currentColor" stroke-width="1.3"/>
+            <path d="M9.2 4.8l1.7 1.7" stroke="currentColor" stroke-width="1.3"/>
+          </svg>
+        </button>
+        <button class="icon-btn" id="action-open" type="button" aria-label="Open plan" title="Open plan">
+          <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
+            <path d="M1.5 8s2.4-4 6.5-4 6.5 4 6.5 4-2.4 4-6.5 4-6.5-4-6.5-4z" fill="none" stroke="currentColor" stroke-width="1.3"/>
+            <circle cx="8" cy="8" r="1.5" fill="currentColor"/>
+          </svg>
+        </button>
+        <button class="icon-btn" id="action-delete" type="button" aria-label="Delete plan" title="Delete plan">
+          <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
+            <path d="M3 4.5h10M6.2 4.5V3h3.6v1.5M4.6 4.5l.5 8h5.8l.5-8" fill="none" stroke="currentColor" stroke-width="1.3"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <footer class="foot">
+    <div class="status-row">
+      <p id="status" role="status">Click a day. Click it again, then click once more to add the plan.</p>
+      <button id="undo" type="button" hidden>Undo</button>
+    </div>
+    <div class="backup">
+      <button id="export" type="button">Export backup</button>
+      <button id="import" type="button">Import backup</button>
+      <button id="export-ics" type="button">Export .ics</button>
+      <button id="import-ics" type="button">Import .ics</button>
+      <input id="import-file" type="file" accept="application/json,.json" hidden>
+      <input id="import-ics-file" type="file" accept="text/calendar,.ics" hidden>
+    </div>
+  </footer>
+
+  <dialog id="help">
+    <form method="dialog">
+      <h3>How to use the year planner</h3>
+      <ul>
+        <li>Click a day to select it. Click it again, then click another day, to add that range. Click the same day a third time to add just that day.</li>
+        <li>Drag across days to add a plan.</li>
+        <li>Drag a bar to move it. Drag either end to resize it. Double-click a bar to edit its note.</li>
+        <li><kbd>T</kbd> jumps to today. <kbd>N</kbd> adds a plan. Arrow keys move the focused day. <kbd>Enter</kbd> edits. <kbd>Esc</kbd> closes. <kbd>?</kbd> opens this list. <kbd>/</kbd> searches. <kbd>Ctrl</kbd>+<kbd>Z</kbd> undoes.</li>
+        <li>Rolling 12 scrolls so the current month sits at the top. The year arrows scroll to January of that year.</li>
+      </ul>
+      <div class="form-actions">
+        <button class="primary" type="submit">Close</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="editor">
+    <form id="editor-form">
+      <h3 id="editor-title">Add plan</h3>
+      <div class="tag-fields">
+        <label>Name
+          <input id="f-title" type="text" maxlength="80" required placeholder="Plan name">
+        </label>
+        <label>Color
+          <input id="f-color" type="color" value="#74a869">
+        </label>
+      </div>
+      <div class="dates">
+        <label>Starts<input id="f-start" type="date" required></label>
+        <label>Ends<input id="f-end" type="date" required></label>
+      </div>
+      <label>Note
+        <textarea id="f-note" maxlength="4000" placeholder="Reminder, a link, or anything to remember"></textarea>
+      </label>
+      <div class="note-tools">
+        <button class="ghost" id="f-attach" type="button">Attach image</button>
+        <input id="f-image" type="file" accept="image/*" hidden>
+      </div>
+      <div class="note-images" id="f-images"></div>
+      <p id="f-error"></p>
+      <div class="form-actions">
+        <button class="ghost" id="f-delete" type="button" hidden>Delete</button>
+        <button class="ghost" id="f-cancel" type="button">Cancel</button>
+        <button class="primary" type="submit">Save</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="planner.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
