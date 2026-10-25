@@ -1,10 +1,12 @@
-/* Year planner UI. Plans live in localStorage. Colors come from theme.css. */
+/* Year planner UI. Plans live in localStorage under year-planner/v1.
+   The visible span is one continuous scroll. Change the years here. */
 (function () {
   var STORAGE_KEY = "year-planner/v1";
+  var RANGE_START = 2026;
+  var RANGE_END = 2027;
 
   var yearLabel = document.getElementById("year-label");
   var statsEl = document.getElementById("stats");
-  var clocksEl = document.getElementById("clocks");
   var board = document.getElementById("board");
   var search = document.getElementById("q");
   var statusEl = document.getElementById("status");
@@ -33,14 +35,17 @@
     if (stored >= 1970 && stored <= 2100) return stored;
     return new Date().getFullYear();
   })();
-  var filter = "all";
   var plans = load();
+  var imagesById = Object.create(null);
   var editingId = null;
   var selection = null;
   var selectedId = null;
   var arm = null;
   var hoverDate = null;
+  var focusDate = null;
   var gesture = null;
+  var createDrag = null;
+  var suppressClick = false;
   var draftImages = [];
   var undoStack = [];
   var noteDismissedFor = null;
@@ -69,12 +74,197 @@
     });
   }
 
-  function save() {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({ version: 1, plans: plans }));
-    } catch (err) {
-      setStatus("Couldn't store the plans in this browser. Export a backup to keep them.");
+  var IMAGE_DB = "year-planner";
+  var IMAGE_STORE = "images";
+  var imageDb = null;
+
+  function storedPlan(plan) {
+    return {
+      id: plan.id,
+      title: plan.title,
+      tag: plan.tag,
+      color: plan.color,
+      note: plan.note || "",
+      start: plan.start,
+      end: plan.end
+    };
+  }
+
+  function cleanImages(list) {
+    var images = [];
+    if (!Array.isArray(list)) return images;
+    list.forEach(function (item) {
+      if (!item || typeof item.src !== "string" || item.src.indexOf("data:image/") !== 0) return;
+      if (images.length >= 4) return;
+      images.push({ name: String(item.name || "image").slice(0, 80), src: item.src });
+    });
+    return images;
+  }
+
+  function syncImageIndex() {
+    plans.forEach(function (plan) {
+      imagesById[plan.id] = plan.images || [];
+    });
+  }
+
+  function openImageDb() {
+    if (imageDb) return Promise.resolve(imageDb);
+    if (!window.indexedDB) return Promise.reject(new Error("no indexedDB"));
+    return new Promise(function (resolve, reject) {
+      var request = indexedDB.open(IMAGE_DB, 1);
+      request.onupgradeneeded = function () {
+        if (!request.result.objectStoreNames.contains(IMAGE_STORE)) {
+          request.result.createObjectStore(IMAGE_STORE);
+        }
+      };
+      request.onsuccess = function () {
+        imageDb = request.result;
+        resolve(imageDb);
+      };
+      request.onerror = function () { reject(request.error || new Error("indexedDB")); };
+    });
+  }
+
+  function readImages() {
+    return openImageDb().then(function (db) {
+      return new Promise(function (resolve, reject) {
+        var tx = db.transaction(IMAGE_STORE, "readonly");
+        var store = tx.objectStore(IMAGE_STORE);
+        var out = Object.create(null);
+        var cursor = store.openCursor();
+        cursor.onsuccess = function () {
+          var row = cursor.result;
+          if (!row) return;
+          out[row.key] = row.value;
+          row.continue();
+        };
+        tx.oncomplete = function () { resolve(out); };
+        tx.onerror = function () { reject(tx.error || new Error("indexedDB")); };
+      });
+    });
+  }
+
+  function writeImages(list) {
+    return openImageDb().then(function (db) {
+      return new Promise(function (resolve, reject) {
+        var tx = db.transaction(IMAGE_STORE, "readwrite");
+        var store = tx.objectStore(IMAGE_STORE);
+        var keep = Object.create(null);
+        list.forEach(function (plan) {
+          keep[plan.id] = true;
+          var images = cleanImages(plan.images);
+          if (images.length) store.put(images, plan.id);
+          else store.delete(plan.id);
+        });
+        var cursor = store.openCursor();
+        cursor.onsuccess = function () {
+          var row = cursor.result;
+          if (!row) return;
+          if (!keep[row.key]) row.delete();
+          row.continue();
+        };
+        tx.oncomplete = function () { resolve(); };
+        tx.onerror = function () { reject(tx.error || new Error("indexedDB")); };
+        tx.onabort = function () { reject(tx.error || new Error("indexedDB")); };
+      });
+    });
+  }
+
+  function plansHaveImages(list) {
+    for (var i = 0; i < list.length; i++) {
+      if (list[i].images && list[i].images.length) return true;
     }
+    return false;
+  }
+
+  function save() {
+    var payload = JSON.stringify({ version: 1, plans: plans.map(storedPlan) });
+    var previous;
+    try {
+      previous = localStorage.getItem(STORAGE_KEY);
+      localStorage.setItem(STORAGE_KEY, payload);
+    } catch (err) {
+      return Promise.resolve(false);
+    }
+    var needsImages = plansHaveImages(plans);
+    if (!window.indexedDB) {
+      if (!needsImages) return Promise.resolve(true);
+      try {
+        if (previous === null) localStorage.removeItem(STORAGE_KEY);
+        else localStorage.setItem(STORAGE_KEY, previous);
+      } catch (err) { /* leave the failed write as-is if we cannot restore */ }
+      return Promise.resolve(false);
+    }
+    return writeImages(plans).then(function () {
+      syncImageIndex();
+      return true;
+    }).catch(function () {
+      if (!needsImages) return true;
+      try {
+        if (previous === null) localStorage.removeItem(STORAGE_KEY);
+        else localStorage.setItem(STORAGE_KEY, previous);
+      } catch (err) { /* metadata restore failed */ }
+      return false;
+    });
+  }
+
+  function hydrateImages() {
+    plans.forEach(function (plan) {
+      plan.images = cleanImages(plan.images);
+      if (plan.images.length) imagesById[plan.id] = plan.images;
+    });
+    var inline = plansHaveImages(plans);
+    if (!window.indexedDB) return Promise.resolve();
+    return readImages().then(function (stored) {
+      plans.forEach(function (plan) {
+        var fromDb = cleanImages(stored[plan.id]);
+        if (plan.images && plan.images.length) imagesById[plan.id] = plan.images;
+        else if (fromDb.length) {
+          plan.images = fromDb;
+          imagesById[plan.id] = fromDb;
+        }
+      });
+      if (inline) return save();
+    }).catch(function () { /* keep whatever load() already attached */ });
+  }
+
+  function snapshotState() {
+    return {
+      plans: plans,
+      selectedId: selectedId,
+      selection: selection,
+      year: year,
+      focusDate: focusDate
+    };
+  }
+
+  function restoreState(state) {
+    plans = state.plans;
+    selectedId = state.selectedId;
+    selection = state.selection;
+    year = state.year;
+    focusDate = state.focusDate;
+  }
+
+  function commitEdit(apply, done) {
+    var before = snapshotState();
+    remember();
+    apply();
+    return save().then(function (stored) {
+      if (!stored) {
+        undoStack.pop();
+        paintUndo();
+        restoreState(before);
+        setStatus("Couldn't store the plans in this browser. Export a backup to keep them.");
+        render();
+        syncTools();
+        return false;
+      }
+      if (done) done();
+      render();
+      syncTools();
+      return true;
+    });
   }
 
   function todayParts() {
@@ -90,39 +280,72 @@
     undoBtn.hidden = undoStack.length === 0;
   }
 
+  function planMeta(plan) {
+    return {
+      id: plan.id,
+      title: plan.title,
+      tag: plan.tag,
+      color: plan.color,
+      note: plan.note,
+      start: plan.start,
+      end: plan.end
+    };
+  }
+
   function remember() {
     undoStack.push({
-      plans: JSON.parse(JSON.stringify(plans)),
+      plans: plans.map(planMeta),
       year: year,
       selectedId: selectedId,
-      selection: selection ? { start: selection.start, end: selection.end } : null
+      selection: selection ? { start: selection.start, end: selection.end } : null,
+      focusDate: focusDate
     });
     if (undoStack.length > 30) undoStack.shift();
     paintUndo();
+  }
+
+  function plansFromSnapshot(list) {
+    return list.map(function (plan) {
+      var copy = planMeta(plan);
+      copy.images = imagesById[plan.id] ? imagesById[plan.id].slice() : [];
+      return copy;
+    });
   }
 
   function undo() {
     var snap = undoStack.pop();
     paintUndo();
     if (!snap) return;
-    plans = snap.plans;
+    var before = snapshotState();
+    plans = plansFromSnapshot(snap.plans);
     year = snap.year;
     selectedId = snap.selectedId;
     selection = snap.selection;
+    focusDate = snap.focusDate || null;
     arm = null;
     hoverDate = null;
     noteDismissedFor = selectedId;
     noteShownFor = null;
     noteCard.hidden = true;
     noteCard.replaceChildren();
-    save();
-    setStatus("Undid the last change.");
-    render();
-    syncTools();
+    save().then(function (stored) {
+      if (!stored) {
+        restoreState(before);
+        undoStack.push(snap);
+        paintUndo();
+        setStatus("Couldn't store the plans in this browser. Export a backup to keep them.");
+        render();
+        syncTools();
+        return;
+      }
+      setStatus("Undid the last change.");
+      render();
+      syncTools();
+    });
   }
 
   function visible() {
-    return Planner.filterPlans(plans, year, filter, search.value);
+    return Planner.filterPlans(plans, RANGE_START + "-01-01", RANGE_END + "-12-31", "all", search.value);
   }
 
   function planById(id) {
@@ -153,6 +376,7 @@
       [String(Planner.daysAway(list, year)), "days away"]
     ];
     renderTodayTile();
+    renderRhythm();
     statsEl.replaceChildren();
     figures.forEach(function (pair) {
       var item = document.createElement("div");
@@ -164,7 +388,6 @@
       item.append(strong, label);
       statsEl.append(item);
     });
-    renderClocks();
   }
 
   function renderTodayTile() {
@@ -178,32 +401,14 @@
     line.textContent = now.getDate() + " " + months[now.getMonth()] + " " + now.getFullYear();
   }
 
-  function pad2(n) {
-    return (n < 10 ? "0" : "") + n;
-  }
-
-  function splitDuration(ms) {
-    var total = Math.max(0, Math.floor(ms / 1000));
-    return {
-      days: Math.floor(total / 86400),
-      hours: Math.floor((total % 86400) / 3600),
-      mins: Math.floor((total % 3600) / 60),
-      secs: total % 60
-    };
-  }
-
-  function dayStamp(iso, end) {
-    var parts = Planner.parse(iso);
-    if (!parts) return null;
-    if (end) return new Date(parts.y, parts.m - 1, parts.d, 23, 59, 59, 999).getTime();
-    return new Date(parts.y, parts.m - 1, parts.d, 0, 0, 0, 0).getTime();
-  }
+  var rhythmNext = null;
+  var rhythmLast = null;
 
   function focusPlan(plan) {
     var start = Planner.parse(plan.start);
-    if (start && start.y !== year) year = start.y;
     selectedId = plan.id;
     selection = { start: plan.start, end: plan.end };
+    focusDate = plan.start;
     arm = null;
     hoverDate = null;
     noteDismissedFor = plan.id;
@@ -213,93 +418,29 @@
     setStatus(plan.title + " · " + rangeLabel(plan));
     render();
     syncTools();
+    if (start) scrollToMonth(start.y, start.m, true);
   }
 
-  function nextClock(plan, ms, reverse) {
-    var piece = splitDuration(ms);
-    var block = document.createElement("button");
-    block.type = "button";
-    block.className = "next-clock" + (reverse ? " since-clock" : "");
-    block.title = "Show " + plan.title + " on the calendar";
-    var kicker = document.createElement("div");
-    kicker.className = "kicker";
-    kicker.textContent = reverse ? "Since last plan" : "Next plan";
-    var who = document.createElement("div");
-    who.className = "who";
-    who.textContent = plan.title;
-    var face = document.createElement("div");
-    face.className = "face";
-    function unit(value, label, days) {
-      var cell = document.createElement("div");
-      cell.className = "unit" + (days ? " days" : "");
-      var num = document.createElement("b");
-      num.textContent = days ? String(value) : pad2(value);
-      var caption = document.createElement("span");
-      caption.textContent = label;
-      cell.append(num, caption);
-      return cell;
-    }
-    function sep() {
-      var mark = document.createElement("div");
-      mark.className = "sep";
-      mark.textContent = ":";
-      return mark;
-    }
-    var days = unit(piece.days, piece.days === 1 ? "Day" : "Days", true);
-    var hours = unit(piece.hours, "Hrs");
-    var mins = unit(piece.mins, "Min");
-    var secs = unit(piece.secs, "Sec");
-    face.append(days, hours, sep(), mins, sep(), secs);
-    block.append(kicker, who, face);
-    block.addEventListener("click", function () { focusPlan(plan); });
-    return block;
+  function dayPhrase(n, soon) {
+    var word = n === 1 ? "day" : "days";
+    return soon ? "in " + n + " " + word : n + " " + word + " ago";
   }
 
-  function clockPlan(kind, plan, ms) {
-    var piece = splitDuration(ms);
-    var block = document.createElement("div");
-    block.className = "clock " + kind;
-    var kicker = document.createElement("div");
-    kicker.className = "kicker";
-    kicker.textContent = kind === "since" ? "Since last plan" : "Next plan";
-    var readout = document.createElement("div");
-    readout.className = "readout";
-    var days = document.createElement("div");
-    days.className = "days";
-    days.append(document.createTextNode(String(piece.days)));
-    var unit = document.createElement("small");
-    unit.textContent = piece.days === 1 ? "day" : "days";
-    days.append(unit);
-    var hms = document.createElement("div");
-    hms.className = "hms";
-    hms.textContent = pad2(piece.hours) + ":" + pad2(piece.mins) + ":" + pad2(piece.secs);
-    readout.append(days, hms);
-    var who = document.createElement("div");
-    who.className = "who";
-    who.textContent = plan.title;
-    block.append(kicker, readout, who);
-    return block;
-  }
-
-  function renderClocks() {
-    var now = new Date();
-    var today = cellDate(now.getFullYear(), now.getMonth() + 1, now.getDate());
+  function renderRhythm() {
+    var today = todayIso();
     var past = null;
     var future = null;
     plans.forEach(function (plan) {
       if (plan.end < today && (!past || plan.end > past.end)) past = plan;
       if (plan.start > today && (!future || plan.start < future.start)) future = plan;
     });
-    clocksEl.replaceChildren();
-    var nowMs = now.getTime();
-    if (past) clocksEl.append(nextClock(past, nowMs - dayStamp(past.end, true), true));
-    if (future) clocksEl.append(nextClock(future, dayStamp(future.start, false) - nowMs, false));
-    if (!past && !future) {
-      var empty = document.createElement("p");
-      empty.className = "empty";
-      empty.textContent = "Add a plan before or after today.";
-      clocksEl.append(empty);
-    }
+    rhythmNext = future;
+    rhythmLast = past;
+    var parts = [];
+    if (future) parts.push("Next: " + future.title + " " + dayPhrase(Planner.diffDays(today, future.start), true));
+    if (past) parts.push("Last: " + past.title + " " + dayPhrase(Planner.diffDays(past.end, today), false));
+    var line = document.getElementById("rhythm");
+    if (line) line.textContent = parts.length ? parts.join(" · ") : "No plans before or after today.";
   }
 
   function cellDate(y, m, d) {
@@ -307,145 +448,232 @@
   }
 
   function dateFromPoint(x, y) {
-    var cells = board.querySelectorAll(".cell[data-date]");
-    for (var i = 0; i < cells.length; i++) {
-      var rect = cells[i].getBoundingClientRect();
-      if (x >= rect.left && x < rect.right && y >= rect.top && y < rect.bottom) {
-        return cells[i].dataset.date;
-      }
-    }
-    return null;
+    var el = document.elementFromPoint(x, y);
+    if (!el) return null;
+    var cell = el.closest && el.closest(".cell[data-date]");
+    if (cell) return cell.dataset.date;
+    var cover = el.closest && (el.closest(".fill") || el.closest(".bar"));
+    if (!cover) return null;
+    var previous = cover.style.pointerEvents;
+    cover.style.pointerEvents = "none";
+    var under = document.elementFromPoint(x, y);
+    cover.style.pointerEvents = previous;
+    cell = under && under.closest && under.closest(".cell[data-date]");
+    return cell ? cell.dataset.date : null;
   }
 
-  function renderBoard() {
-    var list = visible();
-    var laid = Planner.layout(list, year);
-    var today = todayParts();
-    var showToday = today.y === year;
-    var yearGrid = document.createElement("div");
-    yearGrid.className = "calendar";
-    yearGrid.setAttribute("role", "grid");
-    yearGrid.setAttribute("aria-label", "Year " + year);
+  function todayIso() {
+    var now = new Date();
+    return cellDate(now.getFullYear(), now.getMonth() + 1, now.getDate());
+  }
 
-    var corner = document.createElement("div");
-    corner.className = "corner";
-    corner.textContent = "Month";
-    yearGrid.append(corner);
+  function buildGrid() {
+    var months = Planner.monthsInRange(RANGE_START, RANGE_END);
+    var calendar = document.createElement("div");
+    calendar.className = "calendar";
+    calendar.setAttribute("role", "grid");
+    calendar.setAttribute("aria-label", RANGE_START + " through " + RANGE_END);
+    var today = todayIso();
 
-    for (var day = 1; day <= 31; day++) {
-      var head = document.createElement("div");
-      head.className = "daynum";
-      head.dataset.day = String(day);
-      if (showToday && day === today.d) head.classList.add("today");
-      head.textContent = Planner.pad(day);
-      head.style.gridColumn = String(day + 1);
-      head.style.gridRow = "1";
-      yearGrid.append(head);
+    function head(className, text, column) {
+      var el = document.createElement("div");
+      el.className = className + " dayhead";
+      el.textContent = text;
+      el.style.gridColumn = String(column);
+      el.style.gridRow = "1";
+      return el;
     }
 
-    var weekdays = [];
-    for (var month = 1; month <= 12; month++) {
-      var lanes = laid.lanes[month - 1] || 1;
-      if (lanes < 1) lanes = 1;
+    calendar.append(head("corner", "Month", 1));
+    for (var day = 1; day <= 31; day++) {
+      var num = head("daynum", Planner.pad(day), day + 1);
+      num.dataset.day = String(day);
+      calendar.append(num);
+    }
+    var away = head("away-head", "Away", 33);
+    away.title = "Days away this month";
+    calendar.append(away);
+
+    var row = 2;
+    months.forEach(function (month, index) {
+      if (month.m === 1 && index > 0) {
+        var divider = document.createElement("div");
+        divider.className = "year-divider";
+        divider.textContent = String(month.y);
+        divider.style.gridRow = String(row);
+        calendar.append(divider);
+        row += 1;
+      }
+      var key = month.y + "-" + Planner.pad(month.m);
       var label = document.createElement("div");
       label.className = "month";
-      if (showToday && month === today.m) label.classList.add("now");
-      var num = document.createElement("span");
-      num.className = "num";
-      num.textContent = Planner.pad(month);
-      var name = document.createElement("span");
-      name.className = "name";
-      name.textContent = Planner.MONTHS[month - 1];
-      label.append(num, name);
+      label.dataset.ym = key;
+      label.dataset.row = String(row);
+      if (key === today.slice(0, 7)) label.classList.add("now");
+      var monthNum = document.createElement("span");
+      monthNum.className = "num";
+      monthNum.textContent = Planner.pad(month.m);
+      var monthName = document.createElement("span");
+      monthName.className = "name";
+      monthName.textContent = Planner.MONTHS[month.m - 1];
+      label.append(monthNum, monthName);
       label.style.gridColumn = "1";
-      label.style.gridRow = String(month + 1);
-      label.style.setProperty("--lanes", String(lanes));
-      yearGrid.append(label);
+      label.style.gridRow = String(row);
+      calendar.append(label);
 
-      var dim = Planner.daysInMonth(year, month);
+      var dim = Planner.daysInMonth(month.y, month.m);
       for (var d = 1; d <= 31; d++) {
         var cell = document.createElement("div");
         cell.className = "cell";
         cell.style.gridColumn = String(d + 1);
-        cell.style.gridRow = String(month + 1);
-        cell.style.setProperty("--lanes", String(lanes));
+        cell.style.gridRow = String(row);
         if (d > dim) {
           cell.classList.add("void");
         } else {
-          var iso = cellDate(year, month, d);
+          var iso = cellDate(month.y, month.m, d);
           cell.dataset.date = iso;
           var letter = document.createElement("span");
           letter.className = "wd";
-          letter.textContent = Planner.weekdayLetter(year, month, d);
-          letter.style.gridColumn = String(d + 1);
-          letter.style.gridRow = String(month + 1);
-          var dow = Planner.weekday(year, month, d);
-          if (dow === 0) {
+          letter.textContent = Planner.weekdayLetter(month.y, month.m, d);
+          if (Planner.weekday(month.y, month.m, d) === 0) {
             cell.classList.add("weekend");
             letter.classList.add("sun");
           }
-          if (showToday && month === today.m && d === today.d) {
+          if (iso < today) cell.classList.add("past");
+          if (iso === today) {
             cell.classList.add("today");
             letter.classList.add("today");
+            var headDay = calendar.querySelector('.daynum[data-day="' + d + '"]');
+            if (headDay) headDay.classList.add("today");
           }
-          weekdays.push(letter);
-          cell.addEventListener("click", onCellClick);
+          cell.append(letter);
         }
-        yearGrid.append(cell);
+        calendar.append(cell);
       }
-    }
+      var total = document.createElement("div");
+      total.className = "month-total zero";
+      total.dataset.ym = key;
+      total.style.gridColumn = "33";
+      total.style.gridRow = String(row);
+      total.textContent = "0";
+      total.title = "Days away";
+      calendar.append(total);
+      row += 1;
+    });
 
+    board.replaceChildren(calendar);
+  }
+
+  function syncBars() {
+    var list = visible();
+    var laid = Planner.layout(list, RANGE_START + "-01-01", RANGE_END + "-12-31");
+    board.querySelectorAll(".bar").forEach(function (bar) { bar.remove(); });
     var tooled = {};
+    var calendar = board.querySelector(".calendar");
+    if (!calendar) return;
     laid.bars.forEach(function (bar) {
       var plan = bar.plan;
+      var host = board.querySelector('.month[data-ym="' + bar.y + "-" + Planner.pad(bar.month) + '"]');
+      if (!host) return;
       var el = document.createElement("button");
       el.type = "button";
       el.className = "bar";
-      el.style.setProperty("--cat", plan.color || "#74a869");
+      if (bar.continuesBefore) el.classList.add("cont-before");
+      if (bar.continuesAfter) el.classList.add("cont-after");
       if (plan.id === selectedId) el.classList.add("selected");
-      el.title = plan.title + " · " + rangeLabel(plan) + (plan.note ? " · " + plan.note.slice(0, 80) : "");
+      el.style.setProperty("--cat", plan.color || "#74a869");
       el.style.gridColumn = (bar.startDay + 1) + " / " + (bar.endDay + 2);
-      el.style.gridRow = String(bar.month + 1);
+      el.style.gridRow = host.dataset.row;
       el.style.setProperty("--lane", String(bar.lane));
-      el.style.setProperty("--lanes", String(laid.lanes[bar.month - 1] || 1));
+      el.style.setProperty("--lanes", String(laid.lanes[bar.y + "-" + Planner.pad(bar.month)] || 1));
       el.dataset.id = plan.id;
+      el.title = plan.title + " · " + bar.days + "d";
 
       var fill = document.createElement("span");
       fill.className = "fill";
+      if (bar.endDay === bar.startDay && !bar.continuesBefore && !bar.continuesAfter) fill.classList.add("single");
+      if (bar.continuesBefore) {
+        var before = document.createElement("span");
+        before.className = "edge";
+        before.textContent = "‹";
+        fill.append(before);
+      }
       var text = document.createElement("span");
       text.className = "label";
       text.textContent = plan.title;
-      fill.append(text);
-
-      var spanDays = bar.endDay - bar.startDay;
-      if (spanDays < 1) fill.classList.add("single");
+      var count = document.createElement("span");
+      count.className = "count";
+      count.textContent = " · " + bar.days + "d";
+      fill.append(text, count);
+      if (bar.continuesAfter) {
+        var after = document.createElement("span");
+        after.className = "edge";
+        after.textContent = "›";
+        fill.append(after);
+      }
       var planStart = Planner.parse(plan.start);
       var planEnd = Planner.parse(plan.end);
-      var atStart = planStart && planStart.y === year && planStart.m === bar.month && planStart.d === bar.startDay;
-      var atEnd = planEnd && planEnd.y === year && planEnd.m === bar.month && planEnd.d === bar.endDay;
+      var atStart = planStart && planStart.y === bar.y && planStart.m === bar.month && planStart.d === bar.startDay;
+      var atEnd = planEnd && planEnd.y === bar.y && planEnd.m === bar.month && planEnd.d === bar.endDay;
       if (atStart) fill.append(handle("w"));
       if (atEnd) fill.append(handle("e"));
       if (!tooled[plan.id]) {
         tooled[plan.id] = true;
         fill.append(planTools(plan));
       }
-
-      fill.addEventListener("pointerdown", onBarDown);
-      fill.addEventListener("dblclick", function (event) {
-        event.stopPropagation();
-        event.preventDefault();
-        selectedId = plan.id;
-        selection = { start: plan.start, end: plan.end };
-        openEditor(plan, null, true);
-      });
       el.append(fill);
-      yearGrid.append(el);
+      calendar.append(el);
     });
+  }
 
-    weekdays.forEach(function (letter) { yearGrid.append(letter); });
+  function syncTotals() {
+    var list = visible();
+    board.querySelectorAll(".month-total").forEach(function (node) {
+      var parts = node.dataset.ym.split("-");
+      var count = Planner.monthDaysAway(list, +parts[0], +parts[1]);
+      node.textContent = String(count);
+      node.classList.toggle("zero", count === 0);
+      node.title = count === 1 ? "1 day away" : count + " days away";
+    });
+  }
 
-    board.replaceChildren(yearGrid);
-    paintSelection();
+  function syncTips() {
+    board.querySelectorAll(".cell[data-date]").forEach(function (cell) {
+      var iso = cell.dataset.date;
+      var parts = Planner.parse(iso);
+      var when = Planner.weekdayLetter(parts.y, parts.m, parts.d) + " " + parts.d + " " + Planner.MONTHS[parts.m - 1] + " " + parts.y;
+      var names = plansOn(iso).map(function (plan) { return plan.title; });
+      cell.title = names.length ? when + " · " + names.join(", ") : when;
+    });
+  }
+
+  function paintFocus() {
+    board.querySelectorAll(".cell.focus").forEach(function (cell) { cell.classList.remove("focus"); });
+    if (!focusDate) return;
+    var cell = board.querySelector('.cell[data-date="' + focusDate + '"]');
+    if (cell) cell.classList.add("focus");
+  }
+
+  function scrollToMonth(y, m, smooth) {
+    var label = board.querySelector('.month[data-ym="' + y + "-" + Planner.pad(m) + '"]');
+    if (!label) return;
+    var top = label.getBoundingClientRect().top - board.getBoundingClientRect().top + board.scrollTop - 26;
+    var motion = smooth && !window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "smooth" : "auto";
+    board.scrollTo({ top: Math.max(0, top), behavior: motion });
+  }
+
+  function updateViewYear() {
+    var months = board.querySelectorAll(".month");
+    var edge = board.getBoundingClientRect().top + 30;
+    var found = RANGE_START;
+    for (var i = 0; i < months.length; i++) {
+      if (months[i].getBoundingClientRect().bottom > edge) {
+        found = +months[i].dataset.ym.slice(0, 4);
+        break;
+      }
+    }
+    year = found;
+    yearLabel.textContent = String(year);
   }
 
   function toolButton(kind, label, onClick) {
@@ -596,6 +824,38 @@
       noteCard.hidden = true;
       noteCard.replaceChildren();
     }
+    if (!actionEl.hidden) placePopover(actionEl, selection.start);
+  }
+
+  function rectsOverlap(a, b) {
+    return a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
+  }
+
+  function placePopover(el, iso) {
+    var cell = iso && board.querySelector('.cell[data-date="' + iso + '"]');
+    if (!cell) return;
+    el.classList.add("anchored");
+    var width = el.offsetWidth || 280;
+    var height = el.offsetHeight || 48;
+    var month = board.querySelector('.month[data-ym="' + iso.slice(0, 7) + '"]');
+    var row = (month || cell).getBoundingClientRect();
+    var cellRect = cell.getBoundingClientRect();
+    var below = row.bottom + 8;
+    var above = row.top - height - 8;
+    var top = below + height > window.innerHeight - 8 && above > 8 ? above : below;
+    var left = cellRect.left + (cellRect.width / 2) - (width / 2);
+    left = Math.max(8, Math.min(left, window.innerWidth - width - 8));
+    el.style.left = left + "px";
+    el.style.top = Math.max(8, top) + "px";
+    var pop = el.getBoundingClientRect();
+    var hits = false;
+    board.querySelectorAll(".bar").forEach(function (bar) {
+      if (rectsOverlap(pop, bar.getBoundingClientRect())) hits = true;
+    });
+    if (hits) {
+      top = top === below ? above : below;
+      el.style.top = Math.max(8, top) + "px";
+    }
   }
 
   function linkify(text, parent) {
@@ -702,26 +962,47 @@
     closeNote();
   });
 
+  function refreshToday() {
+    var today = todayIso();
+    board.querySelectorAll(".daynum.today").forEach(function (el) { el.classList.remove("today"); });
+    board.querySelectorAll(".month.now").forEach(function (el) { el.classList.remove("now"); });
+    board.querySelectorAll(".cell[data-date]").forEach(function (cell) {
+      var iso = cell.dataset.date;
+      var isToday = iso === today;
+      cell.classList.toggle("past", iso < today);
+      cell.classList.toggle("today", isToday);
+      var letter = cell.querySelector(".wd");
+      if (letter) letter.classList.toggle("today", isToday);
+    });
+    var parts = Planner.parse(today);
+    if (!parts) return;
+    var head = board.querySelector('.daynum[data-day="' + parts.d + '"]');
+    if (head) head.classList.add("today");
+    var month = board.querySelector('.month[data-ym="' + today.slice(0, 7) + '"]');
+    if (month) month.classList.add("now");
+  }
+
   function render() {
     if (selectedId && !planById(selectedId)) selectedId = null;
     renderChrome();
-    renderBoard();
+    if (!board.querySelector(".calendar")) buildGrid();
+    refreshToday();
+    syncBars();
+    syncTotals();
+    syncTips();
+    paintSelection();
+    paintFocus();
+    if (!noteCard.hidden && selectedId && planById(selectedId)) showNote(planById(selectedId), true);
   }
 
-  function listenPointer() {
-    window.addEventListener("pointermove", onPointerMove);
-    window.addEventListener("pointerup", onPointerUp);
-  }
+  function listenPointer() {}
 
-  function silencePointer() {
-    window.removeEventListener("pointermove", onPointerMove);
-    window.removeEventListener("pointerup", onPointerUp);
-  }
+  function silencePointer() {}
 
   function onBarDown(event) {
     if (event.button !== 0) return;
     event.stopPropagation();
-    var bar = event.currentTarget.closest(".bar");
+    var bar = event.target.closest(".bar");
     var plan = planById(bar.dataset.id);
     if (!plan) return;
     var resize = event.target.dataset && event.target.dataset.resize;
@@ -748,6 +1029,16 @@
   }
 
   function onPointerMove(event) {
+    if (createDrag && !gesture) {
+      var over = dateFromPoint(event.clientX, event.clientY);
+      if (over && over !== createDrag.iso && Math.hypot(event.clientX - createDrag.x, event.clientY - createDrag.y) > 6) {
+        createDrag.moved = true;
+        arm = createDrag.iso;
+        hoverDate = over;
+        paintSelection();
+      }
+      return;
+    }
     if (!gesture) return;
     var iso = dateFromPoint(event.clientX, event.clientY);
     if (!gesture.moved && Math.hypot(event.clientX - gesture.x, event.clientY - gesture.y) < 6) return;
@@ -758,7 +1049,7 @@
     var preview = previewDates(gesture, iso);
     if (!preview) return;
     paintDrop(preview.start, preview.end);
-    board.querySelectorAll('.bar[data-id="' + plan.id + '"]').forEach(function (bar) {
+    board.querySelectorAll('.bar[data-id="' + CSS.escape(plan.id) + '"]').forEach(function (bar) {
       bar.classList.add("lifting");
     });
     setStatus(gesture.mode === "move"
@@ -781,6 +1072,21 @@
   }
 
   function onPointerUp(event) {
+    if (createDrag && !gesture) {
+      var drag = createDrag;
+      createDrag = null;
+      if (drag.moved) {
+        suppressClick = true;
+        selection = ordered(drag.iso, hoverDate || drag.iso);
+        arm = null;
+        hoverDate = null;
+        focusDate = selection.start;
+        clearPlanSelection();
+        paintSelection();
+        openEditor(null, { start: selection.start, end: selection.end });
+      }
+      return;
+    }
     silencePointer();
     if (!gesture) return;
     var current = gesture;
@@ -845,15 +1151,16 @@
       render();
       return;
     }
-    remember();
-    plans = plans.map(function (item) { return item.id === id ? normalized : item; });
-    var startYear = Planner.parse(normalized.start).y;
-    if (startYear !== year) year = startYear;
-    selectedId = normalized.id;
-    selection = { start: normalized.start, end: normalized.end };
-    save();
-    setStatus("Moved " + normalized.title + " to " + rangeLabel(normalized) + ".");
-    render();
+    var parts = Planner.parse(normalized.start);
+    commitEdit(function () {
+      plans = plans.map(function (item) { return item.id === id ? normalized : item; });
+      selectedId = normalized.id;
+      selection = { start: normalized.start, end: normalized.end };
+      focusDate = normalized.start;
+    }, function () {
+      setStatus("Moved " + normalized.title + " to " + rangeLabel(normalized) + ".");
+      if (parts) scrollToMonth(parts.y, parts.m, true);
+    });
   }
 
   function clearPlanSelection() {
@@ -874,7 +1181,15 @@
   }
 
   function onCellClick(event) {
-    var iso = event.currentTarget.dataset.date;
+    if (suppressClick) {
+      suppressClick = false;
+      return;
+    }
+    var cell = event.target.closest && event.target.closest(".cell[data-date]");
+    if (!cell || event.target.closest(".bar")) return;
+    var iso = cell.dataset.date;
+    focusDate = iso;
+    paintFocus();
     clearPlanSelection();
     if (arm) {
       commitRange(iso);
@@ -957,6 +1272,7 @@
     deleteBtn.hidden = !plan;
     document.getElementById("editor-title").textContent = plan ? "Edit plan" : "Add plan";
     dialog.showModal();
+    requestAnimationFrame(function () { placePopover(dialog, start); });
     if (focusNote && plan) {
       noteInput.focus();
     } else {
@@ -1026,36 +1342,39 @@
       formError.textContent = "Give the plan a name and a real start and end date.";
       return;
     }
-    remember();
-    if (editingId) {
-      plans = plans.map(function (plan) {
-        return plan.id === editingId ? normalized : plan;
-      });
-    } else {
-      plans = plans.concat([normalized]);
-    }
-    var startYear = Planner.parse(normalized.start).y;
-    if (startYear !== year) year = startYear;
-    selectedId = normalized.id;
-    selection = { start: normalized.start, end: normalized.end };
-    arm = null;
-    hoverDate = null;
-    noteDismissedFor = null;
-    save();
-    closeEditor();
-    setStatus((editingId ? "Updated " : "Added ") + normalized.title + ".");
-    render();
+    var wasEditing = !!editingId;
+    var id = editingId;
+    commitEdit(function () {
+      if (id) {
+        plans = plans.map(function (plan) {
+          return plan.id === id ? normalized : plan;
+        });
+      } else {
+        plans = plans.concat([normalized]);
+      }
+      selectedId = normalized.id;
+      selection = { start: normalized.start, end: normalized.end };
+      focusDate = normalized.start;
+      arm = null;
+      hoverDate = null;
+      noteDismissedFor = null;
+    }, function () {
+      closeEditor();
+      setStatus((wasEditing ? "Updated " : "Added ") + normalized.title + ".");
+      var parts = Planner.parse(normalized.start);
+      if (parts) scrollToMonth(parts.y, parts.m, true);
+    });
   });
 
   function deletePlan(id) {
     var plan = planById(id);
     if (!plan) return;
-    remember();
-    plans = plans.filter(function (item) { return item.id !== id; });
-    if (selectedId === id) selectedId = null;
-    save();
-    setStatus("Deleted " + plan.title + ".");
-    render();
+    commitEdit(function () {
+      plans = plans.filter(function (item) { return item.id !== id; });
+      if (selectedId === id) selectedId = null;
+    }, function () {
+      setStatus("Deleted " + plan.title + ".");
+    });
   }
 
   deleteBtn.addEventListener("click", function () {
@@ -1093,39 +1412,64 @@
   });
 
   document.getElementById("prev").addEventListener("click", function () {
-    year -= 1;
-    arm = null;
-    hoverDate = null;
-    render();
+    scrollToMonth(Math.max(RANGE_START, year - 1), 1, true);
   });
   document.getElementById("next").addEventListener("click", function () {
-    year += 1;
-    arm = null;
-    hoverDate = null;
-    render();
+    scrollToMonth(Math.min(RANGE_END, year + 1), 1, true);
   });
   document.getElementById("today-title").addEventListener("click", function () {
     document.getElementById("today").click();
   });
 
   document.getElementById("today").addEventListener("click", function () {
-    year = todayParts().y;
     var today = todayParts();
-    selection = { start: cellDate(year, today.m, today.d), end: cellDate(year, today.m, today.d) };
+    focusDate = cellDate(today.y, today.m, today.d);
+    selection = { start: focusDate, end: focusDate };
     arm = null;
     hoverDate = null;
     selectedId = null;
-    render();
-    var cell = board.querySelector(".cell.today");
-    if (cell) cell.scrollIntoView({ block: "nearest", inline: "nearest" });
+    paintSelection();
+    paintFocus();
+    scrollToMonth(today.y, today.m, true);
+  });
+
+  var rollingBtn = document.getElementById("rolling");
+  var rolling = sessionStorage.getItem("year-planner/rolling") === "1";
+  function paintRolling() {
+    rollingBtn.setAttribute("aria-pressed", rolling ? "true" : "false");
+  }
+  paintRolling();
+  rollingBtn.addEventListener("click", function () {
+    rolling = !rolling;
+    sessionStorage.setItem("year-planner/rolling", rolling ? "1" : "0");
+    paintRolling();
+    if (rolling) {
+      var today = todayParts();
+      scrollToMonth(today.y, today.m, true);
+    } else {
+      scrollToMonth(year, 1, true);
+    }
+  });
+
+  document.getElementById("help-btn").addEventListener("click", function () {
+    document.getElementById("help").showModal();
   });
   document.getElementById("add").addEventListener("click", function () {
     addFromSelection(false);
   });
 
+  var searchTimer = 0;
   search.addEventListener("input", function () {
-    render();
-    search.focus();
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(function () {
+      render();
+      search.focus();
+    }, 180);
+  });
+
+  document.getElementById("rhythm").addEventListener("click", function () {
+    if (rhythmNext) focusPlan(rhythmNext);
+    else if (rhythmLast) focusPlan(rhythmLast);
   });
 
   undoBtn.addEventListener("click", undo);
@@ -1148,9 +1492,92 @@
     link.href = url;
     link.download = "year-planner.json";
     link.click();
-    URL.revokeObjectURL(url);
+    setTimeout(function () { URL.revokeObjectURL(url); }, 1500);
     setStatus("Exported " + plans.length + " plans.");
   });
+
+  function newId(suffix) {
+    if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+    return String(Date.now()) + "-" + suffix;
+  }
+
+  function dedupeIds(list) {
+    var seen = Object.create(null);
+    return list.map(function (plan, index) {
+      var copy = {
+        id: plan.id,
+        title: plan.title,
+        tag: plan.tag,
+        color: plan.color,
+        note: plan.note,
+        images: plan.images ? plan.images.slice() : [],
+        start: plan.start,
+        end: plan.end
+      };
+      if (!copy.id || seen[copy.id]) copy.id = newId(index);
+      seen[copy.id] = true;
+      return copy;
+    });
+  }
+
+  function mergeById(current, incoming) {
+    var byId = Object.create(null);
+    var order = [];
+    current.forEach(function (plan) {
+      byId[plan.id] = plan;
+      order.push(plan.id);
+    });
+    incoming.forEach(function (plan) {
+      var existing = byId[plan.id];
+      if (!existing) order.push(plan.id);
+      else if ((!plan.images || !plan.images.length) && existing.images && existing.images.length) {
+        plan.images = existing.images.slice();
+      }
+      byId[plan.id] = plan;
+    });
+    return order.map(function (id) { return byId[id]; });
+  }
+
+  function askImport(count, noun) {
+    var chooser = document.getElementById("import-mode");
+    var text = document.getElementById("import-mode-text");
+    var label = noun || "plans";
+    if (!chooser || typeof chooser.showModal !== "function") {
+      if (window.confirm("Replace all current plans with the " + count + " imported " + label + "?")) return Promise.resolve("replace");
+      if (window.confirm("Merge the imported " + label + " into the current list?")) return Promise.resolve("merge");
+      return Promise.resolve("cancel");
+    }
+    text.textContent = "This file has " + count + " " + label + ". Replace the current list, or merge them in?";
+    return new Promise(function (resolve) {
+      function onClose() {
+        chooser.removeEventListener("close", onClose);
+        resolve(chooser.returnValue || "cancel");
+      }
+      chooser.addEventListener("close", onClose);
+      chooser.showModal();
+    });
+  }
+
+  function adoptPlans(next, skipped, noun) {
+    var unique = dedupeIds(next);
+    askImport(unique.length, noun).then(function (mode) {
+      if (mode !== "replace" && mode !== "merge") {
+        setStatus("Import cancelled.");
+        return;
+      }
+      var merged = mode === "merge" ? dedupeIds(mergeById(plans, unique)) : unique;
+      commitEdit(function () {
+        plans = merged;
+        selectedId = null;
+        selection = null;
+        arm = null;
+        hoverDate = null;
+      }, function () {
+        var verb = mode === "merge" ? "Merged " : "Imported ";
+        setStatus(verb + unique.length + " " + noun + (skipped ? ", skipped " + skipped : "") + ".");
+      });
+    });
+  }
 
   document.getElementById("import").addEventListener("click", function () {
     document.getElementById("import-file").click();
@@ -1173,10 +1600,16 @@
         setStatus("The backup needs a plans list.");
         return;
       }
+      if (data !== null && typeof data !== "object") {
+        setStatus("That file is not a backup.");
+        return;
+      }
       var next = [];
+      var skipped = 0;
       list.forEach(function (item) {
+        if (!item || typeof item !== "object" || Array.isArray(item)) { skipped += 1; return; }
         var plan = Planner.normalize(item);
-        if (!plan) return;
+        if (!plan) { skipped += 1; return; }
         if (!plan.id) plan.id = crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + next.length;
         next.push(plan);
       });
@@ -1184,13 +1617,7 @@
         setStatus("No plans found in that backup.");
         return;
       }
-      remember();
-      plans = next;
-      selectedId = null;
-      selection = null;
-      save();
-      setStatus("Imported " + next.length + " plans.");
-      render();
+      adoptPlans(next, skipped, "plans");
     });
   });
 
@@ -1205,30 +1632,70 @@
       render();
       return;
     }
+    var help = document.getElementById("help");
+    if (event.key === "Escape" && help.open) {
+      help.close();
+      return;
+    }
+    var importMode = document.getElementById("import-mode");
+    if (event.key === "Escape" && importMode && importMode.open) return;
     if (event.key === "Escape" && !dialog.open) {
       selection = null;
       arm = null;
       hoverDate = null;
       selectedId = null;
+      focusDate = null;
       paintSelection();
+      paintFocus();
       board.querySelectorAll(".bar.selected").forEach(function (bar) { bar.classList.remove("selected"); });
       return;
     }
-    if (typing || dialog.open) return;
+    if (typing || dialog.open || help.open) return;
     if (event.key === "t" || event.key === "T") {
       document.getElementById("today").click();
     } else if (event.key === "[") {
-      year -= 1;
-      render();
+      scrollToMonth(Math.max(RANGE_START, year - 1), 1, true);
     } else if (event.key === "]") {
-      year += 1;
-      render();
-    } else if (event.key === "n" || event.key === "a") {
-      addFromSelection(false);
+      scrollToMonth(Math.min(RANGE_END, year + 1), 1, true);
+    } else if (event.key === "?" ) {
+      help.showModal();
+    } else if (event.key === "n" || event.key === "N" || event.key === "a") {
+      var iso = focusDate || (selection && selection.start) || todayIso();
+      openEditor(null, { start: iso, end: (selection && selection.end) || iso });
     } else if (event.key === "Enter") {
       var chosen = selectedId ? planById(selectedId) : null;
+      if (!chosen && focusDate) {
+        var onDay = plansOn(focusDate);
+        if (onDay.length) chosen = onDay[0];
+      }
       if (chosen) openEditor(chosen);
+      else if (focusDate) openEditor(null, { start: focusDate, end: focusDate });
       else if (selection) addFromSelection(false);
+    } else if (event.key === "ArrowLeft" || event.key === "ArrowRight" || event.key === "ArrowUp" || event.key === "ArrowDown") {
+      event.preventDefault();
+      var dayDelta = event.key === "ArrowLeft" ? -1 : event.key === "ArrowRight" ? 1 : 0;
+      var monthDelta = event.key === "ArrowUp" ? -1 : event.key === "ArrowDown" ? 1 : 0;
+      var base = Planner.parse(focusDate || (selection && selection.start) || todayIso());
+      var nextIso;
+      if (dayDelta) {
+        nextIso = Planner.addDays(cellDate(base.y, base.m, base.d), dayDelta);
+      } else {
+        var y = base.y;
+        var m = base.m + monthDelta;
+        while (m < 1) { m += 12; y -= 1; }
+        while (m > 12) { m -= 12; y += 1; }
+        var d = Math.min(base.d, Planner.daysInMonth(y, m));
+        nextIso = cellDate(y, m, d);
+      }
+      var next = Planner.parse(nextIso);
+      if (!next || next.y < RANGE_START || next.y > RANGE_END) return;
+      focusDate = nextIso;
+      paintFocus();
+      var cell = board.querySelector('.cell[data-date="' + focusDate + '"]');
+      if (cell) {
+        var top = cell.getBoundingClientRect().top - board.getBoundingClientRect().top;
+        if (top < 26 || top > board.clientHeight - 40) scrollToMonth(next.y, next.m, true);
+      }
     } else if ((event.key === "Delete" || event.key === "Backspace") && selectedId) {
       event.preventDefault();
       deletePlan(selectedId);
@@ -1238,8 +1705,220 @@
     }
   });
 
-  window.addEventListener("pointermove", onArmMove);
-  setInterval(renderClocks, 1000);
+  function onPointerCancel() {
+    var dragging = !!(gesture || (createDrag && createDrag.moved));
+    createDrag = null;
+    gesture = null;
+    clearDrop();
+    if (!dragging) return;
+    arm = null;
+    hoverDate = null;
+    render();
+  }
 
-  render();
+  window.addEventListener("pointermove", onArmMove);
+  window.addEventListener("pointermove", onPointerMove);
+  window.addEventListener("pointerup", onPointerUp);
+  window.addEventListener("pointercancel", onPointerCancel);
+
+  board.addEventListener("click", onCellClick);
+  board.addEventListener("dblclick", function (event) {
+    var bar = event.target.closest && event.target.closest(".bar");
+    if (!bar) return;
+    var plan = planById(bar.dataset.id);
+    if (!plan) return;
+    event.preventDefault();
+    selectedId = plan.id;
+    selection = { start: plan.start, end: plan.end };
+    focusDate = plan.start;
+    openEditor(plan, null, true);
+  });
+  board.addEventListener("pointerdown", function (event) {
+    if (event.button !== 0) return;
+    if (event.target.closest && event.target.closest("[data-act], .plan-tools")) return;
+    var fill = event.target.closest && event.target.closest(".fill");
+    if (fill) {
+      onBarDown(event);
+      return;
+    }
+    var cell = event.target.closest && event.target.closest(".cell[data-date]");
+    if (!cell) return;
+    createDrag = { iso: cell.dataset.date, x: event.clientX, y: event.clientY, moved: false };
+  });
+  board.addEventListener("scroll", function () {
+    if (board.dataset.ticking) return;
+    board.dataset.ticking = "1";
+    requestAnimationFrame(function () {
+      board.dataset.ticking = "";
+      updateViewYear();
+    });
+  });
+
+  document.addEventListener("pointerdown", function (event) {
+    if (actionEl.hidden) return;
+    if (actionEl.contains(event.target)) return;
+    if (event.target.closest && event.target.closest(".cell[data-date], .bar, #add, #today, #today-title")) return;
+    selection = null;
+    arm = null;
+    hoverDate = null;
+    paintSelection();
+  });
+
+  dialog.addEventListener("click", function (event) {
+    if (event.target === dialog) closeEditor();
+  });
+
+  function download(filename, text, type) {
+    var blob = new Blob([text], { type: type });
+    var url = URL.createObjectURL(blob);
+    var link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    link.click();
+    setTimeout(function () { URL.revokeObjectURL(url); }, 1500);
+  }
+
+  function escapeIcs(text) {
+    return String(text || "").replace(/\\/g, "\\\\").replace(/\n/g, "\\n").replace(/,/g, "\\,").replace(/;/g, "\\;");
+  }
+
+  function unescapeIcs(text) {
+    return String(text || "").replace(/\\n/gi, "\n").replace(/\\,/g, ",").replace(/\\;/g, ";").replace(/\\\\/g, "\\");
+  }
+
+  function plansToIcs(list) {
+    var lines = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Year Planner//EN", "CALSCALE:GREGORIAN"];
+    list.forEach(function (plan) {
+      lines.push("BEGIN:VEVENT");
+      lines.push("UID:" + plan.id + "@year-planner");
+      lines.push("SUMMARY:" + escapeIcs(plan.title));
+      lines.push("DTSTART;VALUE=DATE:" + plan.start.replace(/-/g, ""));
+      lines.push("DTEND;VALUE=DATE:" + Planner.addDays(plan.end, 1).replace(/-/g, ""));
+      if (plan.note) lines.push("DESCRIPTION:" + escapeIcs(plan.note));
+      lines.push("END:VEVENT");
+    });
+    lines.push("END:VCALENDAR");
+    return lines.join("\r\n") + "\r\n";
+  }
+
+  function plansFromIcs(text) {
+    var unfolded = String(text || "").replace(/\r\n[ \t]/g, "").replace(/\n[ \t]/g, "");
+    if (unfolded.indexOf("BEGIN:VCALENDAR") === -1) return { error: "That file is not a calendar." };
+    var blocks = unfolded.split("BEGIN:VEVENT").slice(1);
+    var next = [];
+    var skipped = 0;
+    blocks.forEach(function (block) {
+      var body = block.split("END:VEVENT")[0];
+      var summary = "";
+      var start = "";
+      var end = "";
+      var note = "";
+      var uid = "";
+      body.split(/\r?\n/).forEach(function (line) {
+        var cut = line.indexOf(":");
+        if (cut < 1) return;
+        var key = line.slice(0, cut).split(";")[0].toUpperCase();
+        var value = line.slice(cut + 1).trim();
+        if (key === "SUMMARY") summary = unescapeIcs(value);
+        if (key === "DESCRIPTION") note = unescapeIcs(value);
+        if (key === "UID") uid = value;
+        if (key === "DTSTART") start = value.replace(/[^0-9]/g, "").slice(0, 8);
+        if (key === "DTEND") end = value.replace(/[^0-9]/g, "").slice(0, 8);
+      });
+      if (start.length !== 8) { skipped += 1; return; }
+      var startIso = start.slice(0, 4) + "-" + start.slice(4, 6) + "-" + start.slice(6, 8);
+      var endIso = startIso;
+      if (end.length === 8) {
+        endIso = Planner.addDays(end.slice(0, 4) + "-" + end.slice(4, 6) + "-" + end.slice(6, 8), -1);
+        if (endIso < startIso) endIso = startIso;
+      }
+      var plan = Planner.normalize({
+        id: uid ? uid.split("@")[0] : "",
+        title: summary || "Plan",
+        note: note,
+        start: startIso,
+        end: endIso
+      });
+      if (!plan) { skipped += 1; return; }
+      if (!plan.id) plan.id = crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + next.length;
+      next.push(plan);
+    });
+    return { plans: next, skipped: skipped };
+  }
+
+  document.getElementById("export-ics").addEventListener("click", function () {
+    download("year-planner.ics", plansToIcs(plans), "text/calendar");
+    setStatus("Exported " + plans.length + " plans as a calendar.");
+  });
+  document.getElementById("import-ics").addEventListener("click", function () {
+    document.getElementById("import-ics-file").click();
+  });
+  document.getElementById("import-ics-file").addEventListener("change", function (event) {
+    var file = event.target.files && event.target.files[0];
+    event.target.value = "";
+    if (!file) return;
+    file.text().then(function (text) {
+      var parsed = plansFromIcs(text);
+      if (parsed.error) { setStatus(parsed.error); return; }
+      if (!parsed.plans.length) { setStatus("No events found in that calendar."); return; }
+      adoptPlans(parsed.plans, parsed.skipped, "events");
+    });
+  });
+
+  var minuteTimer = 0;
+  var midnightTimer = 0;
+
+  function clearClock() {
+    clearInterval(minuteTimer);
+    clearTimeout(midnightTimer);
+    minuteTimer = 0;
+    midnightTimer = 0;
+  }
+
+  function armClock() {
+    clearClock();
+    if (document.hidden) return;
+    minuteTimer = setInterval(function () {
+      if (document.hidden) return;
+      renderRhythm();
+    }, 60000);
+    var now = new Date();
+    var nextMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+    midnightTimer = setTimeout(function () {
+      if (!document.hidden) render();
+      armClock();
+    }, Math.max(1000, nextMidnight.getTime() - now.getTime() + 50));
+  }
+
+  document.addEventListener("visibilitychange", function () {
+    if (document.hidden) {
+      clearClock();
+      return;
+    }
+    render();
+    armClock();
+  });
+
+  if (location.protocol === "http:" || location.protocol === "https:") {
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.register("sw.js").catch(function () {});
+    }
+  }
+
+  var booted = false;
+  function boot() {
+    render();
+    if (booted) return;
+    booted = true;
+    var today = todayParts();
+    var y = today.y;
+    var m = today.m;
+    if (y < RANGE_START) { y = RANGE_START; m = 1; }
+    if (y > RANGE_END) { y = RANGE_END; m = 12; }
+    scrollToMonth(y, m, false);
+    updateViewYear();
+    armClock();
+  }
+  hydrateImages().then(boot, boot);
+  setTimeout(boot, 800);
 })();

@@ -9,6 +9,7 @@ which does this before launching the window.
 from __future__ import annotations
 
 import re
+import tomllib
 from pathlib import Path
 
 THEME_DIR = Path.home() / ".local/state/omarchy/current/theme"
@@ -33,18 +34,22 @@ ALIASES = {
 
 
 def parse_colors(text: str) -> tuple[str, dict[str, str]]:
-    mode = "dark"
+    data = tomllib.loads(text)
+    mode = data.get("mode", "dark")
+    if not isinstance(mode, str):
+        mode = "dark"
     colors: dict[str, str] = {}
-    for raw in text.splitlines():
-        line = raw.split("#", 1)[0].strip()
-        if not line or "=" not in line:
-            continue
-        key, value = (part.strip() for part in line.split("=", 1))
-        value = value.strip().strip('"').strip("'")
-        if key == "mode":
-            mode = value
-        elif re.fullmatch(r"#[0-9a-fA-F]{6}", value):
-            colors[key] = value.lower()
+
+    def walk(node: object) -> None:
+        if not isinstance(node, dict):
+            return
+        for key, value in node.items():
+            if isinstance(value, dict):
+                walk(value)
+            elif isinstance(value, str) and re.fullmatch(r"#[0-9a-fA-F]{6}", value):
+                colors[str(key)] = value.lower()
+
+    walk(data)
     return mode, colors
 
 

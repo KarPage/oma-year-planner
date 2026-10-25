@@ -5,24 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Year planner</title>
   <meta name="theme-color" content="#000d04">
-  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="manifest" href="manifest.json">
   <style>
     :root {
-      color-scheme: dark;
-      --bg: #000d04;
-      --bg-raised: #171f1a;
-      --bg-deep: #000300;
-      --fg: #fcfff4;
-      --fg-dim: #d1d4ca;
-      --muted: #545754;
-      --accent: #41a468;
-      --travel: #74a869;
-      --work: #37a388;
-      --personal: #c0d1a4;
-      --other: #54bda1;
-      --sun: #e4b0a4;
+      --sun: var(--personal, #c0d1a4);
       --range: #e6d48a;
-      --danger: #c47868;
+      --danger: color-mix(in srgb, var(--fg) 62%, var(--bg));
       --handle: #f4efe2;
       --line: color-mix(in srgb, var(--fg) 12%, transparent);
       --line-strong: color-mix(in srgb, var(--fg) 28%, transparent);
@@ -166,121 +155,6 @@
       gap: 14px 20px;
       width: 100%;
     }
-    .clocks {
-      display: flex;
-      flex: 1 1 100%;
-      flex-wrap: wrap;
-      align-items: flex-end;
-      justify-content: center;
-      gap: 14px 28px;
-      min-width: 0;
-    }
-    .since-clock,
-    .next-clock {
-      flex: 0 0 auto;
-      max-width: 100%;
-    }
-    .clock { display: flex; flex-direction: column; gap: 3px; }
-    .clock .kicker {
-      font-size: 10px;
-      font-weight: 600;
-      letter-spacing: 0.16em;
-      text-transform: uppercase;
-      color: var(--muted);
-    }
-    .clock .readout {
-      display: flex;
-      align-items: baseline;
-      gap: 12px;
-      font-family: var(--mono);
-      font-variant-numeric: tabular-nums;
-      line-height: 1;
-    }
-    .clock .days { font-size: 28px; font-weight: 700; letter-spacing: -0.04em; }
-    .clock .days small { margin-left: 4px; font-size: 11px; font-weight: 500; color: var(--muted); }
-    .clock .hms { font-size: 16px; font-weight: 500; letter-spacing: 0.06em; }
-    .clock .who { font-size: 12px; color: var(--fg-dim); }
-    .clock.since .days { color: var(--fg); }
-    .clock.since .hms { color: #c47868; }
-    .clocks .empty { margin: 0; color: var(--muted); font-size: 13px; }
-    .next-clock {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 2px;
-      padding: 0;
-      border: 0;
-      background: transparent;
-      color: inherit;
-      text-align: center;
-      cursor: pointer;
-    }
-    .next-clock .kicker {
-      font-size: 10px;
-      font-weight: 600;
-      letter-spacing: 0.2em;
-      text-transform: uppercase;
-      color: var(--accent);
-    }
-    .since-clock .kicker { color: #e4b0a4; }
-    .next-clock .who {
-      font-size: 15px;
-      font-weight: 600;
-      letter-spacing: -0.02em;
-      color: var(--fg);
-    }
-    .next-clock .face {
-      display: flex;
-      align-items: flex-end;
-      gap: 5px;
-    }
-    .next-clock .unit {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      min-width: 44px;
-      padding: 6px 7px 5px;
-      border: 1px solid color-mix(in srgb, var(--accent) 32%, transparent);
-      background: color-mix(in srgb, var(--accent) 7%, transparent);
-    }
-    .next-clock .unit.days {
-      min-width: 64px;
-      border-color: color-mix(in srgb, var(--accent) 70%, transparent);
-    }
-    .next-clock .unit b {
-      font-family: var(--mono);
-      font-size: 18px;
-      font-weight: 600;
-      line-height: 1;
-      color: var(--accent);
-      font-variant-numeric: tabular-nums;
-    }
-    .next-clock .unit.days b { font-size: 28px; font-weight: 700; }
-    .next-clock .unit span {
-      margin-top: 5px;
-      font-size: 9px;
-      font-weight: 600;
-      letter-spacing: 0.14em;
-      text-transform: uppercase;
-      color: var(--muted);
-    }
-    .next-clock .sep {
-      padding-bottom: 16px;
-      font-family: var(--mono);
-      font-size: 18px;
-      line-height: 1;
-      color: color-mix(in srgb, var(--accent) 70%, transparent);
-    }
-    .since-clock .unit {
-      border-color: color-mix(in srgb, #e4b0a4 34%, transparent);
-      background: color-mix(in srgb, #e4b0a4 8%, transparent);
-    }
-    .since-clock .unit.days { border-color: color-mix(in srgb, #e4b0a4 72%, transparent); }
-    .since-clock .unit b,
-    .since-clock .sep { color: #e4b0a4; }
-    .next-clock:hover .unit { background: color-mix(in srgb, var(--accent) 14%, transparent); }
-    .since-clock:hover .unit { background: color-mix(in srgb, #e4b0a4 16%, transparent); }
-
     .hud-side {
       display: flex;
       flex: 1 1 100%;
@@ -379,6 +253,7 @@
       color: var(--fg-dim);
       font-size: 15px;
       letter-spacing: -0.01em;
+      cursor: pointer;
     }
 
     .stage {
@@ -392,7 +267,8 @@
       flex: 1;
       min-width: 0;
       min-height: 0;
-      overflow: auto;
+      overflow-x: auto;
+      overflow-y: auto;
       container-type: size;
       scroll-padding-top: 26px;
       border-top: 1px solid var(--line-strong);
@@ -402,7 +278,7 @@
 
     .calendar {
       --head: 26px;
-      --month-h: calc((100cqh - var(--head)) / 12);
+      --month-h: calc((100dvh - 11rem) / 12);
       display: grid;
       grid-template-columns: 4.4rem repeat(31, minmax(0, 1fr)) 2.6rem;
       grid-auto-rows: auto;
@@ -579,7 +455,7 @@
     }
     .fill .count { flex: none; opacity: 0.85; }
     .fill .edge { flex: none; font-weight: 700; }
-    @container (max-width: 5.5rem) {
+    @container (max-width: 8.5rem) {
       .fill .count { display: none; }
     }
     .bar.cont-before .fill {
@@ -943,6 +819,18 @@
       </ul>
       <div class="form-actions">
         <button class="primary" type="submit">Close</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="import-mode">
+    <form method="dialog">
+      <h3>Import plans</h3>
+      <p id="import-mode-text"></p>
+      <div class="form-actions">
+        <button class="ghost" value="cancel">Cancel</button>
+        <button class="ghost" value="merge">Merge</button>
+        <button class="primary" value="replace">Replace</button>
       </div>
     </form>
   </dialog>
