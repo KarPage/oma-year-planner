@@ -156,7 +156,12 @@ h1.today-headline {
   padding: 6px 18px;
   border-left: 1px solid var(--line);
 }
-.stats { border-left: 0; padding-left: 4px; }
+.stats { border-left: 0; padding-left: 4px; flex: none; }
+#rhythm .dash-group {
+  flex: 1 1 0;
+  min-width: 0;
+}
+#dash-extra { display: none; }
 .stats {
   display: flex;
   flex: none;
@@ -322,8 +327,9 @@ h1.today-headline {
   flex-direction: column;
   align-items: flex-start;
   gap: 4px;
+  width: 100%;
   min-width: 0;
-  max-width: 16rem;
+  max-width: none;
   padding: 4px 2px;
   border: 0;
   border-radius: 0;
@@ -443,7 +449,7 @@ h1.today-headline {
   color: var(--muted);
   font-size: 12px;
 }
-.dash .search { margin-left: auto; }
+.dash .search { margin-left: 8px; }
 .range-note {
   margin: 0;
   padding: 3px 12px 4px;
@@ -469,7 +475,7 @@ label.search {
   width: 220px;
   max-width: min(240px, 100%);
   height: 32px;
-  margin: 6px 8px 6px auto;
+  margin: 6px 8px;
   padding: 0 8px;
   border: 1px solid var(--line-strong);
   background: var(--bg);
@@ -573,16 +579,27 @@ label.search input::placeholder {
   .board { scroll-behavior: auto; }
 }
 
+.dayhead-bar,
 .calendar {
-  --month-h: calc((100dvh - 16rem) / 12);
-  --month-h: max(0px, calc((100cqh - var(--head) - 22px) / 12));
   display: grid;
   grid-template-columns: 4.4rem repeat(31, minmax(0, 1fr)) 2.6rem;
-  grid-auto-rows: auto;
   width: 100%;
   max-width: 100%;
   min-width: 0;
-  overflow-x: hidden;
+}
+.dayhead-bar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  height: var(--head);
+  background: var(--bg);
+  border-bottom: 1px solid var(--line);
+}
+.calendar {
+  --month-h: calc((100dvh - 16rem) / 12);
+  --month-h: max(0px, calc((100cqh - var(--head) - 22px) / 12));
+  grid-auto-rows: auto;
+  overflow-x: clip;
   font-family: var(--mono);
   user-select: none;
 }
@@ -600,14 +617,11 @@ label.search input::placeholder {
   overflow: hidden;
   background: color-mix(in srgb, var(--accent) 9%, var(--bg));
 }
-.dayhead {
-  position: sticky;
-  top: 0;
-  z-index: 9;
+.dayhead-bar .corner,
+.dayhead-bar .daynum,
+.dayhead-bar .away-head {
   height: var(--head);
-  min-height: 0;
-  /* Cover a subpixel seam so the previous month cannot peek past the snap. */
-  box-shadow: 0 1px 0 color-mix(in srgb, var(--accent) 9%, var(--bg));
+  background: var(--bg);
 }
 .corner { color: var(--muted); font-size: 10px; font-weight: 500; }
 .daynum { color: var(--fg); font-size: 11px; font-weight: 600; }
@@ -1673,6 +1687,7 @@ textarea {
 }
 
 @media (min-width: 1001px) {
+  .dayhead-bar,
   .calendar { grid-template-columns: 5.4rem repeat(31, minmax(0, 1fr)) 3.1rem; }
   .month .name { font-size: 18px; }
   .bar:not(.single):not(.is-brief) .fill { font-size: 14px; }
@@ -1683,7 +1698,7 @@ textarea {
 
 
 @media (max-width: 1280px) {
-  .dash-up { display: none; }
+  .dash-group.is-up { display: none; }
   .today-line { font-size: 26px; }
   .dash-event .num { font-size: 22px; }
   .stat-box b { font-size: 18px; }
@@ -1719,9 +1734,10 @@ textarea {
   label.search {
     width: 140px;
     height: 32px;
-    margin: 4px 8px 4px auto;
+    margin: 4px 8px;
   }
   .board { --head: 20px; }
+  .dayhead-bar,
   .calendar { grid-template-columns: 2.4rem repeat(31, minmax(0, 1fr)) 1.25rem; }
   .month { padding: 0 2px; }
   .month .num { display: none; }
@@ -1738,6 +1754,7 @@ textarea {
   .backup button { font-size: 12px; }
 }
 @media (max-width: 640px) {
+  .dayhead-bar,
   .calendar { grid-template-columns: 1.5rem repeat(31, minmax(0, 1fr)) 0.9rem; }
   .month .name { font-size: 8px; }
   .daynum { font-size: 7px; }

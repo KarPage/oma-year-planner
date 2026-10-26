@@ -45,7 +45,6 @@ function renderChrome() {
     item.append(strong, label);
     statsEl.append(item);
   });
-  renderDashExtra(list);
 }
 
 function shortDate(iso) {
@@ -109,6 +108,7 @@ function renderTodayTile() {
 }
 
 var rhythmNext = null;
+var rhythmUp = null;
 var rhythmLast = null;
 
 function focusPlan(plan) {
@@ -148,7 +148,7 @@ function dashEvent(which, plan, days, soon) {
   button.dataset.which = which;
   var caption = document.createElement("span");
   caption.className = "k";
-  caption.textContent = which === "next" ? "Next" : "Last";
+  caption.textContent = which === "up" ? "Up next" : (which === "last" ? "Last" : "Next");
   var row = document.createElement("span");
   row.className = "row";
   var name = document.createElement("span");
@@ -163,7 +163,8 @@ function dashEvent(which, plan, days, soon) {
     unit.className = "unit";
     unit.textContent = soon ? (days === 1 ? "day" : "days") : "days ago";
     row.append(num, unit);
-    button.title = (which === "next" ? "Next: " : "Last: ") + plan.title + " " + dayPhrase(days, soon);
+    var lead = which === "up" ? "Up next: " : (which === "last" ? "Last: " : "Next: ");
+    button.title = lead + plan.title + " " + dayPhrase(days, soon);
   } else {
     button.disabled = true;
   }
@@ -174,23 +175,34 @@ function dashEvent(which, plan, days, soon) {
 function renderRhythm() {
   var today = todayIso();
   var past = null;
-  var future = null;
+  var futures = [];
   plans.forEach(function (plan) {
     if (plan.end < today && (!past || plan.end > past.end)) past = plan;
-    if (plan.start > today && (!future || plan.start < future.start)) future = plan;
+    if (plan.start > today) futures.push(plan);
   });
+  futures.sort(function (a, b) {
+    return a.start < b.start ? -1 : a.start > b.start ? 1 : 0;
+  });
+  var future = futures[0] || null;
+  var up = futures[1] || null;
   rhythmNext = future;
+  rhythmUp = up;
   rhythmLast = past;
   var host = document.getElementById("rhythm");
   if (!host) return;
   host.replaceChildren();
-  var nextGroup = document.createElement("div");
-  nextGroup.className = "dash-group";
-  nextGroup.append(dashEvent("next", future, future ? Planner.diffDays(today, future.start) : 0, true));
-  var lastGroup = document.createElement("div");
-  lastGroup.className = "dash-group";
-  lastGroup.append(dashEvent("last", past, past ? Planner.diffDays(past.end, today) : 0, false));
-  host.append(nextGroup, lastGroup);
+  function group(which, plan, soon) {
+    var node = document.createElement("div");
+    node.className = "dash-group" + (which === "up" ? " is-up" : "");
+    var days = plan ? Planner.diffDays(soon ? today : plan.end, soon ? plan.start : today) : 0;
+    node.append(dashEvent(which, plan, days, soon));
+    return node;
+  }
+  host.append(
+    group("next", future, true),
+    group("up", up, true),
+    group("last", past, false)
+  );
 }
 
 function fitMarquee() {}
@@ -251,6 +263,8 @@ function todayIso() {
 
 function buildGrid() {
   var months = Planner.monthsInRange(RANGE_START, RANGE_END);
+  var bar = document.createElement("div");
+  bar.className = "dayhead-bar";
   var calendar = document.createElement("div");
   calendar.className = "calendar";
   calendar.setAttribute("role", "grid");
@@ -259,30 +273,28 @@ function buildGrid() {
 
   function head(className, text, column) {
     var el = document.createElement("div");
-    el.className = className + " dayhead";
+    el.className = className;
     el.textContent = text;
     el.style.gridColumn = String(column);
-    el.style.gridRow = "1";
     return el;
   }
 
-  calendar.append(head("corner", "Month", 1));
+  bar.append(head("corner", "Month", 1));
   for (var day = 1; day <= 31; day++) {
     var num = head("daynum", Planner.pad(day), day + 1);
     num.dataset.day = String(day);
-    calendar.append(num);
+    bar.append(num);
   }
   var away = document.createElement("button");
   away.type = "button";
-  away.className = "away-head dayhead";
+  away.className = "away-head";
   away.textContent = "Away";
   away.title = "Days away from home this month";
   away.setAttribute("aria-label", "Days away from home this month");
   away.style.gridColumn = "33";
-  away.style.gridRow = "1";
-  calendar.append(away);
+  bar.append(away);
 
-  var row = 2;
+  var row = 1;
   months.forEach(function (month, index) {
     if (month.m === 1 && index > 0) {
       var divider = document.createElement("div");
@@ -341,7 +353,7 @@ function buildGrid() {
         if (iso === today) {
           cell.classList.add("today");
           letter.classList.add("today");
-          var headDay = calendar.querySelector('.daynum[data-day="' + d + '"]');
+          var headDay = bar.querySelector('.daynum[data-day="' + d + '"]');
           if (headDay) headDay.classList.add("today");
         }
         cell.append(letter);
@@ -360,7 +372,7 @@ function buildGrid() {
     row += 1;
   });
 
-  board.replaceChildren(calendar);
+  board.replaceChildren(bar, calendar);
 }
 
 function googleMark() {
@@ -564,7 +576,7 @@ function paintFocus() {
 }
 
 function headHeight() {
-  var head = board.querySelector(".dayhead");
+  var head = board.querySelector(".dayhead-bar");
   var measured = head ? head.getBoundingClientRect().height : 0;
   if (!(measured > 0)) {
     var raw = parseFloat(getComputedStyle(board).getPropertyValue("--head"));

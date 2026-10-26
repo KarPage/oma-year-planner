@@ -126,7 +126,8 @@ search.addEventListener("input", function () {
 document.getElementById("rhythm").addEventListener("click", function (event) {
   var button = event.target.closest && event.target.closest(".dash-event");
   if (!button) return;
-  var plan = button.dataset.which === "last" ? rhythmLast : rhythmNext;
+  var which = button.dataset.which;
+  var plan = which === "last" ? rhythmLast : (which === "up" ? rhythmUp : rhythmNext);
   if (plan) focusPlan(plan);
 });
 

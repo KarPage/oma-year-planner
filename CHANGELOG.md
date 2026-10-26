@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- The day header stays pinned while the months scroll. The dashboard adds an Up next box beside Next.
 - Sharp terminal chrome. Next and Last are flat neon counts. One-day marks are dots with a short label.
 - The dashboard is four groups: counts, Next, Last, and a short Upcoming list.
 - Plan bars are glass. The editor palette is teal, sky, lavender, sand, rose, and mint.
