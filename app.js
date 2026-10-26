@@ -33,6 +33,12 @@
   var rangeFloater = document.getElementById("range-floater");
   var tipEl = document.getElementById("tip");
   var dayList = document.getElementById("day-list");
+  var quickEdit = document.getElementById("quick-edit");
+  var qeName = document.getElementById("qe-name");
+  var quickId = null;
+  var quickReturn = null;
+  var awayPop = document.getElementById("away-pop");
+  var awayReturn = null;
 
   var year = (function () {
     var stored = +sessionStorage.getItem("year-planner/year");
@@ -591,8 +597,14 @@
       num.dataset.day = String(day);
       calendar.append(num);
     }
-    var away = head("away-head", "Away", 33);
-    away.title = "Days away this month";
+    var away = document.createElement("button");
+    away.type = "button";
+    away.className = "away-head dayhead";
+    away.textContent = "Away";
+    away.title = "Days away from home this month";
+    away.setAttribute("aria-label", "Days away from home this month");
+    away.style.gridColumn = "33";
+    away.style.gridRow = "1";
     calendar.append(away);
 
     var row = 2;
@@ -661,7 +673,8 @@
         }
         calendar.append(cell);
       }
-      var total = document.createElement("div");
+      var total = document.createElement("button");
+      total.type = "button";
       total.className = "month-total zero";
       total.dataset.ym = key;
       total.style.gridColumn = "33";
@@ -676,9 +689,7 @@
   }
 
   function singleStackHeight(count) {
-    if (!count) return 0;
-    var lines = Math.min(count, 3);
-    return 2 + (lines - 1) * 5 + 4 + 3;
+    return Planner.singleMarkerReserve(count);
   }
 
   function syncBars() {
@@ -782,6 +793,7 @@
         tick.dataset.id = plan.id;
         tick.dataset.date = iso;
         tick.setAttribute("aria-label", plan.title);
+        tick.title = plan.title;
         var mark = document.createElement("span");
         mark.className = "fill single";
         tick.append(mark);
@@ -808,7 +820,9 @@
       var count = Planner.monthDaysAway(list, +parts[0], +parts[1]);
       node.textContent = String(count);
       node.classList.toggle("zero", count === 0);
-      node.title = Planner.plural(count, "day") + " away";
+      var awayLabel = Planner.plural(count, "day") + " away from home";
+      node.title = awayLabel;
+      node.setAttribute("aria-label", awayLabel);
     });
   }
 
@@ -1171,7 +1185,8 @@
 
   function openDayList(iso, anchor) {
     if (!dayList) return;
-    var list = plansOn(iso).filter(Planner.isSingleDay);
+    var all = plansOn(iso).filter(Planner.isSingleDay);
+    var list = all.length > 3 ? all.slice(3) : all;
     if (!list.length) return;
     hideTip();
     dayList.hidden = false;
@@ -1190,32 +1205,218 @@
       name.textContent = plan.title;
       pick.append(swatch, name);
       pick.addEventListener("click", function () {
+        var back = anchor;
         closeDayList();
-        selectedId = plan.id;
-        selection = { start: plan.start, end: plan.end };
-        focusDate = plan.start;
-        arm = null;
-        hoverDate = null;
-        noteDismissedFor = null;
-        render();
-        var chosen = planById(plan.id);
-        if (chosen) showNote(chosen, true);
-        syncTools();
+        openQuickEdit(plan.id, back);
       });
-      var edit = document.createElement("button");
-      edit.type = "button";
-      edit.className = "ghost";
-      edit.textContent = "Edit";
-      edit.addEventListener("click", function () {
-        closeDayList();
-        selectedId = plan.id;
-        openEditor(plan);
-      });
-      row.append(pick, edit);
+      row.append(pick);
       dayList.append(row);
     });
     var rect = anchor.getBoundingClientRect();
-    placeFixed(dayList, rect.left, rect.bottom, 0, 6);
+    var placed = Planner.placeNear(
+      { left: rect.left, top: rect.top, bottom: rect.bottom },
+      { width: dayList.offsetWidth || 180, height: dayList.offsetHeight || 40 },
+      { width: window.innerWidth, height: window.innerHeight }
+    );
+    dayList.style.left = placed.left + "px";
+    dayList.style.top = placed.top + "px";
+  }
+
+  function closeQuickEdit(restore) {
+    if (!quickEdit || quickEdit.hidden) return;
+    quickEdit.hidden = true;
+    var back = quickReturn;
+    quickReturn = null;
+    quickId = null;
+    if (restore && back && back.focus) back.focus();
+  }
+
+  function themeSwatch(name) {
+    var value = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+    return /^#[0-9a-fA-F]{6}$/.test(value) ? value.toLowerCase() : "";
+  }
+
+  function paintQuickSwatches(plan) {
+    var row = document.getElementById("qe-swatches");
+    if (!row) return;
+    row.replaceChildren();
+    ["--travel", "--work", "--personal", "--other"].forEach(function (name) {
+      var hex = themeSwatch(name);
+      if (!hex) return;
+      var button = document.createElement("button");
+      button.type = "button";
+      button.className = "qe-swatch";
+      button.style.background = "var(" + name + ")";
+      button.setAttribute("aria-label", name.slice(2));
+      button.setAttribute("aria-pressed", plan.color === hex ? "true" : "false");
+      button.addEventListener("click", function () {
+        saveQuick({ color: hex });
+      });
+      row.append(button);
+    });
+  }
+
+  function closeAwayPop(restore) {
+    if (!awayPop || awayPop.hidden) return;
+    awayPop.hidden = true;
+    awayPop.replaceChildren();
+    var back = awayReturn;
+    awayReturn = null;
+    if (restore && back) focusNoScroll(back);
+  }
+
+  function placeAwayPop(anchor) {
+    var box = anchor.getBoundingClientRect();
+    var size = awayPop.getBoundingClientRect();
+    var placed = Planner.placeNear(
+      { left: box.left, top: box.top, bottom: box.bottom },
+      { width: size.width || 280, height: size.height || 80 },
+      { width: window.innerWidth, height: window.innerHeight }
+    );
+    awayPop.style.left = placed.left + "px";
+    awayPop.style.top = placed.top + "px";
+    var live = awayPop.getBoundingClientRect();
+    var dx = 0;
+    var dy = 0;
+    if (live.right > window.innerWidth - 8) dx = window.innerWidth - 8 - live.right;
+    if (live.left < 8) dx = 8 - live.left;
+    if (live.bottom > window.innerHeight - 8) dy = window.innerHeight - 8 - live.bottom;
+    if (live.top < 8) dy = 8 - live.top;
+    if (dx || dy) {
+      awayPop.style.left = (placed.left + dx) + "px";
+      awayPop.style.top = (placed.top + dy) + "px";
+    }
+    awayPop.classList.toggle("above", placed.flipped);
+    var arrow = box.left + (box.width / 2) - (placed.left + dx) - 4;
+    awayPop.style.setProperty("--arrow", Math.max(12, Math.min(arrow, (live.width || 280) - 20)) + "px");
+    awayPop.style.setProperty("--origin-y", placed.flipped ? "100%" : "0");
+  }
+
+  function focusNoScroll(el) {
+    if (el && el.focus) el.focus({ preventScroll: true });
+  }
+
+  function openAwayExplainer(anchor) {
+    if (!awayPop) return;
+    closeQuickEdit(false);
+    closeDayList();
+    hideTip();
+    awayReturn = anchor;
+    awayPop.hidden = false;
+    awayPop.replaceChildren();
+    var text = document.createElement("p");
+    text.textContent = "Days away: total trip days in each month. Click a number for details.";
+    awayPop.append(text);
+    placeAwayPop(anchor);
+    focusNoScroll(awayPop);
+  }
+
+  function openAwayMonth(ym, anchor) {
+    if (!awayPop) return;
+    var parts = String(ym || "").split("-");
+    var detail = Planner.monthAwayDetail(visible(), +parts[0], +parts[1]);
+    closeQuickEdit(false);
+    closeDayList();
+    hideTip();
+    awayReturn = anchor;
+    awayPop.hidden = false;
+    awayPop.replaceChildren();
+    var title = document.createElement("p");
+    title.className = "away-title";
+    title.textContent = detail.label + " · " + Planner.plural(detail.days, "day") + " away";
+    awayPop.append(title);
+    if (!detail.plans.length) {
+      var empty = document.createElement("p");
+      empty.className = "away-empty";
+      empty.textContent = "No trips this month.";
+      awayPop.append(empty);
+    } else {
+      var list = document.createElement("ul");
+      detail.plans.forEach(function (item) {
+        var li = document.createElement("li");
+        var button = document.createElement("button");
+        button.type = "button";
+        button.className = "away-plan";
+        var dot = document.createElement("span");
+        dot.className = "dot";
+        dot.style.background = item.color || "var(--accent)";
+        var name = document.createElement("span");
+        name.className = "name";
+        var when = item.start === item.end
+          ? Planner.prettyDate(item.start)
+          : Planner.prettyDate(item.start) + " – " + Planner.prettyDate(item.end);
+        name.textContent = item.title + ": " + when + " (" + Planner.plural(item.days, "day") + ")";
+        button.append(dot, name);
+        button.addEventListener("click", function () {
+          var back = awayReturn;
+          closeAwayPop(false);
+          openQuickEdit(item.id, back);
+        });
+        li.append(button);
+        list.append(li);
+      });
+      awayPop.append(list);
+    }
+    placeAwayPop(anchor);
+    var first = awayPop.querySelector("button");
+    focusNoScroll(first || awayPop);
+  }
+
+  function openQuickEdit(id, returnEl) {
+    var plan = planById(id);
+    if (!plan || !quickEdit) return;
+    closeAwayPop(false);
+    closeDayList();
+    hideTip();
+    quickId = id;
+    quickReturn = returnEl || null;
+    quickEdit.hidden = false;
+    qeName.value = plan.title;
+    paintQuickSwatches(plan);
+    var mark = board.querySelector('.bar.single[data-id="' + CSS.escape(id) + '"]');
+    var anchor = mark || returnEl;
+    var box = anchor && anchor.getBoundingClientRect ? anchor.getBoundingClientRect() : { left: 16, top: 16, bottom: 32 };
+    var size = quickEdit.getBoundingClientRect();
+    var placed = Planner.placeNear(
+      { left: box.left, top: box.top, bottom: box.bottom },
+      { width: size.width || 260, height: size.height || 140 },
+      { width: window.innerWidth, height: window.innerHeight }
+    );
+    quickEdit.style.left = placed.left + "px";
+    quickEdit.style.top = placed.top + "px";
+    qeName.focus();
+    qeName.select();
+  }
+
+  function saveQuick(patch) {
+    var plan = planById(quickId);
+    if (!plan) return;
+    var title = patch && patch.title != null ? String(patch.title).trim() : plan.title;
+    if (!title) return;
+    var color = patch && patch.color ? patch.color : plan.color;
+    if (title === plan.title && color === plan.color) return;
+    var id = plan.id;
+    var keepOpen = !patch || patch.title == null;
+    var normalized = Planner.normalize({
+      id: plan.id,
+      title: title,
+      tag: plan.tag,
+      color: color,
+      note: plan.note,
+      images: plan.images,
+      start: plan.start,
+      end: plan.end
+    });
+    if (!normalized) return;
+    commitEdit(function () {
+      plans = plans.map(function (item) { return item.id === id ? normalized : item; });
+      selectedId = id;
+    }, function () {
+      setStatus("Updated " + normalized.title + ".");
+      var mark = board.querySelector('.bar.single[data-id="' + CSS.escape(id) + '"]');
+      if (keepOpen && mark) openQuickEdit(id, mark);
+      else if (mark && mark.focus) mark.focus();
+    });
   }
 
   function showAddBar(range) {
@@ -1560,7 +1761,9 @@
     var current = gesture;
     gesture = null;
     clearDrop();
+    if (current.single && current.moved) suppressClick = true;
     if (!current.moved) {
+      if (current.single) return;
       if (arm && current.grabDate) {
         commitRange(current.grabDate);
         return;
@@ -1742,8 +1945,10 @@
     renderDraftImages();
     deleteBtn.hidden = !plan;
     document.getElementById("editor-title").textContent = plan ? "Edit plan" : "Add plan";
+    dialog.classList.remove("anchored");
+    dialog.style.left = "";
+    dialog.style.top = "";
     dialog.showModal();
-    requestAnimationFrame(function () { placePopover(dialog, start); });
     if (focusNote && plan) {
       noteInput.focus();
     } else {
@@ -1922,8 +2127,36 @@
     }
   });
 
+  var WELCOME_KEY = "year-planner/welcome";
+
+  function savedPlanCount() {
+    try {
+      var raw = JSON.parse(localStorage.getItem(STORAGE_KEY) || "null");
+      if (raw && Array.isArray(raw.plans)) return raw.plans.length;
+    } catch (err) { /* no saved plans yet */ }
+    return 0;
+  }
+
+  function openHelp(mode) {
+    var help = document.getElementById("help");
+    var welcome = mode === "welcome";
+    help.classList.toggle("is-welcome", welcome);
+    document.getElementById("help-keys").open = false;
+    var again = document.getElementById("help-show-again");
+    if (welcome && again) again.checked = false;
+    if (!help.open) help.showModal();
+  }
+
+  document.getElementById("help").addEventListener("close", function () {
+    var help = document.getElementById("help");
+    if (!help.classList.contains("is-welcome")) return;
+    var again = document.getElementById("help-show-again");
+    if (again && again.checked) return;
+    try { localStorage.setItem(WELCOME_KEY, "1"); } catch (err) { /* private mode */ }
+  });
+
   document.getElementById("help-btn").addEventListener("click", function () {
-    document.getElementById("help").showModal();
+    openHelp("guide");
   });
   document.getElementById("add").addEventListener("click", function () {
     addFromSelection(false);
@@ -2095,6 +2328,42 @@
       }
       return;
     }
+    if (awayPop && !awayPop.hidden && event.key === "Escape") {
+      event.preventDefault();
+      closeAwayPop(true);
+      return;
+    }
+    if (quickEdit && !quickEdit.hidden) {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        closeQuickEdit(true);
+        return;
+      }
+      if (event.key === "Tab") {
+        var items = Array.prototype.slice.call(quickEdit.querySelectorAll("input, button")).filter(function (el) {
+          return !el.disabled;
+        });
+        if (!items.length) return;
+        var first = items[0];
+        var last = items[items.length - 1];
+        if (event.shiftKey && document.activeElement === first) {
+          event.preventDefault();
+          last.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+          event.preventDefault();
+          first.focus();
+        }
+        return;
+      }
+      if (event.key === "Enter" && event.target === qeName) {
+        event.preventDefault();
+        var typed = qeName.value.trim();
+        var current = planById(quickId);
+        if (current && typed && typed !== current.title) saveQuick({ title: typed });
+        else closeQuickEdit(true);
+        return;
+      }
+    }
     if (event.key === "Escape" && gesture) {
       gesture = null;
       silencePointer();
@@ -2127,6 +2396,12 @@
       return;
     }
     if (typing || dialog.open || help.open) return;
+    var markerKey = document.activeElement && document.activeElement.closest && document.activeElement.closest(".bar.single");
+    if (markerKey && (event.key === "Enter" || event.key === " ")) {
+      event.preventDefault();
+      openQuickEdit(markerKey.dataset.id, markerKey);
+      return;
+    }
     if (event.key === "t" || event.key === "T") {
       document.getElementById("today").click();
     } else if (event.key === "[") {
@@ -2134,7 +2409,7 @@
     } else if (event.key === "]") {
       scrollToMonth(Math.min(RANGE_END, year + 1), 1, true);
     } else if (event.key === "?" ) {
-      help.showModal();
+      openHelp("guide");
     } else if (event.key === "n" || event.key === "N" || event.key === "a") {
       var iso = focusDate || (selection && selection.start) || todayIso();
       openEditor(null, { start: iso, end: (selection && selection.end) || iso });
@@ -2219,17 +2494,39 @@
   window.addEventListener("pointercancel", onPointerCancel);
 
   board.addEventListener("click", function (event) {
-    var mark = event.target.closest && event.target.closest(".bar.single, .single-more");
-    if (mark) {
+    var awayHead = event.target.closest && event.target.closest(".away-head");
+    if (awayHead) {
       event.preventDefault();
-      openDayList(mark.dataset.date, mark);
+      openAwayExplainer(awayHead);
+      return;
+    }
+    var total = event.target.closest && event.target.closest(".month-total");
+    if (total) {
+      event.preventDefault();
+      openAwayMonth(total.dataset.ym, total);
+      return;
+    }
+    var mark = event.target.closest && event.target.closest(".bar.single");
+    if (mark) {
+      if (suppressClick) {
+        suppressClick = false;
+        return;
+      }
+      event.preventDefault();
+      openQuickEdit(mark.dataset.id, mark);
+      return;
+    }
+    var more = event.target.closest && event.target.closest(".single-more");
+    if (more) {
+      event.preventDefault();
+      openDayList(more.dataset.date, more);
       return;
     }
     onCellClick(event);
   });
   board.addEventListener("dblclick", function (event) {
     var bar = event.target.closest && event.target.closest(".bar");
-    if (!bar) return;
+    if (!bar || bar.classList.contains("single")) return;
     var plan = planById(bar.dataset.id);
     if (!plan) return;
     event.preventDefault();
@@ -2241,8 +2538,24 @@
   board.addEventListener("pointerdown", function (event) {
     if (event.button !== 0) return;
     pointerXY = { x: event.clientX, y: event.clientY };
-    if (event.target.closest && event.target.closest("[data-act], .plan-tools, #day-list")) return;
-    if (event.target.closest && event.target.closest(".bar.single, .single-more")) return;
+    if (event.target.closest && event.target.closest("[data-act], .plan-tools, #day-list, #quick-edit")) return;
+    var singleMark = event.target.closest && event.target.closest(".bar.single");
+    if (singleMark) {
+      gesture = {
+        kind: "plan",
+        mode: "move",
+        single: true,
+        id: singleMark.dataset.id,
+        originStart: singleMark.dataset.date,
+        originEnd: singleMark.dataset.date,
+        grabDate: singleMark.dataset.date,
+        moved: false,
+        x: event.clientX,
+        y: event.clientY
+      };
+      return;
+    }
+    if (event.target.closest && event.target.closest(".single-more")) return;
     var scroller = event.target.closest && event.target.closest(".month, .year-divider");
     if (scroller) {
       startBoardDrag(event);
@@ -2277,6 +2590,8 @@
   }, { passive: true });
   board.addEventListener("scroll", function () {
     closeDayList();
+    closeQuickEdit(false);
+    closeAwayPop(false);
     hideTip();
     if (board.dataset.ticking) return;
     board.dataset.ticking = "1";
@@ -2288,6 +2603,10 @@
 
   document.addEventListener("pointerdown", function (event) {
     pointerXY = { x: event.clientX, y: event.clientY };
+    if (awayPop && !awayPop.hidden && !awayPop.contains(event.target) && !(event.target.closest && event.target.closest(".away-head, .month-total"))) {
+      closeAwayPop(false);
+    }
+    if (quickEdit && !quickEdit.hidden && !quickEdit.contains(event.target)) closeQuickEdit(false);
     if (dayList && !dayList.hidden && !dayList.contains(event.target) && !(event.target.closest && event.target.closest(".bar.single, .single-more"))) {
       closeDayList();
     }
@@ -2302,6 +2621,18 @@
 
   dialog.addEventListener("click", function (event) {
     if (event.target === dialog) closeEditor();
+  });
+
+  document.getElementById("qe-delete").addEventListener("click", function () {
+    var id = quickId;
+    if (!id) return;
+    closeQuickEdit(false);
+    deletePlan(id);
+  });
+  document.getElementById("qe-more").addEventListener("click", function () {
+    var plan = planById(quickId);
+    closeQuickEdit(false);
+    if (plan) openEditor(plan);
   });
 
   function download(filename, text, type) {
@@ -2417,6 +2748,7 @@
     minuteTimer = setInterval(function () {
       if (document.hidden) return;
       renderRhythm();
+      refreshToday();
     }, 60000);
     var now = new Date();
     var nextMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
@@ -2463,6 +2795,9 @@
     scrollToMonth(y, m, false);
     updateViewYear();
     armClock();
+    try {
+      if (!savedPlanCount() && localStorage.getItem(WELCOME_KEY) !== "1") openHelp("welcome");
+    } catch (err) { /* private mode */ }
   }
   hydrateImages().then(boot, boot);
   setTimeout(boot, 800);

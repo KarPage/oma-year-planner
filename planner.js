@@ -203,6 +203,41 @@ var Planner = (function () {
     return plan.start === end;
   }
 
+  /* Room the multi-day bars leave for single-day pills.
+     7px pill, 2px gap, 3px inset from the cell bottom, 3px clearance.
+     At most three pills, then a +N. */
+  function singleMarkerReserve(count) {
+    var shown = Math.min(Math.max(0, count | 0), 3);
+    if (!shown) return 0;
+    return 3 + shown * 7 + (shown - 1) * 2 + 3;
+  }
+
+  /* Keep a popover fully inside the viewport. Prefer below the anchor,
+     flip above when that would clip, then shift left or right. */
+  function placeNear(anchor, size, view, gap, margin) {
+    var g = gap == null ? 6 : gap;
+    var edge = margin == null ? 8 : margin;
+    var width = size.width;
+    var height = size.height;
+    var left = anchor.left;
+    var top = anchor.bottom + g;
+    var flipped = false;
+    if (top + height > view.height - edge) {
+      var above = anchor.top - height - g;
+      if (above >= edge) {
+        top = above;
+        flipped = true;
+      } else {
+        top = view.height - edge - height;
+      }
+    }
+    if (top < edge) top = edge;
+    if (top + height > view.height - edge) top = Math.max(edge, view.height - edge - height);
+    if (left + width > view.width - edge) left = view.width - edge - width;
+    if (left < edge) left = edge;
+    return { left: left, top: top, flipped: flipped };
+  }
+
   function daysInMonth(y, m) {
     return new Date(Date.UTC(y, m, 0)).getUTCDate();
   }
@@ -303,6 +338,41 @@ var Planner = (function () {
       continuesBefore: start < from,
       continuesAfter: end > to,
       days: diffDays(start, end) + 1
+    };
+  }
+
+  var FULL_MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+
+  function monthAwayDetail(plans, y, m) {
+    var dim = daysInMonth(y, m);
+    var from = y + "-" + pad(m) + "-01";
+    var to = y + "-" + pad(m) + "-" + pad(dim);
+    var rows = [];
+    (plans || []).forEach(function (plan) {
+      if (!plan || !parse(plan.start) || !parse(plan.end)) return;
+      var start = plan.start < plan.end ? plan.start : plan.end;
+      var end = plan.end < plan.start ? plan.start : plan.end;
+      if (end < from || start > to) return;
+      var clipStart = start < from ? from : start;
+      var clipEnd = end > to ? to : end;
+      rows.push({
+        id: plan.id ? String(plan.id) : "",
+        title: String(plan.title || ""),
+        color: plan.color || "",
+        start: clipStart,
+        end: clipEnd,
+        days: diffDays(clipStart, clipEnd) + 1
+      });
+    });
+    rows.sort(function (a, b) {
+      if (a.start < b.start) return -1;
+      if (a.start > b.start) return 1;
+      return 0;
+    });
+    return {
+      label: FULL_MONTHS[m - 1] + " " + y,
+      days: monthDaysAway(plans || [], y, m),
+      plans: rows
     };
   }
 
@@ -669,6 +739,51 @@ var Planner = (function () {
     if (!barKeepsDayCount(81, 80)) errors.push("bar count tolerance");
     if (barKeepsDayCount(90, 40)) errors.push("bar count drop");
     if (!barKeepsDayCount(40, 0)) errors.push("bar count unmeasured");
+    if (singleMarkerReserve(0) !== 0) errors.push("marker reserve empty");
+    if (singleMarkerReserve(1) !== 13) errors.push("marker reserve one");
+    if (singleMarkerReserve(3) !== 31) errors.push("marker reserve three");
+    if (singleMarkerReserve(8) !== 31) errors.push("marker reserve cap");
+    var below = placeNear(
+      { left: 20, top: 40, bottom: 60 },
+      { width: 120, height: 80 },
+      { width: 800, height: 600 }
+    );
+    if (below.top !== 66 || below.left !== 20 || below.flipped) errors.push("place below");
+    var flipped = placeNear(
+      { left: 20, top: 520, bottom: 540 },
+      { width: 120, height: 80 },
+      { width: 800, height: 600 }
+    );
+    if (!flipped.flipped || flipped.top !== 434) errors.push("place flip " + flipped.top);
+    var shifted = placeNear(
+      { left: 900, top: 40, bottom: 60 },
+      { width: 200, height: 40 },
+      { width: 1000, height: 600 }
+    );
+    if (shifted.left !== 792 || shifted.top !== 66) errors.push("place shift " + shifted.left);
+    var clamped = placeNear(
+      { left: -40, top: 10, bottom: 30 },
+      { width: 900, height: 700 },
+      { width: 400, height: 300 }
+    );
+    if (clamped.left !== 8 || clamped.top !== 8) errors.push("place clamp");
+    if (clamped.top + 700 > 300 - 8 && clamped.top !== 8) errors.push("place clamp top");
+    var away = monthAwayDetail([
+      { id: "nish", title: "Nish Canada", color: "#74a869", start: "2026-11-17", end: "2026-11-24" },
+      { id: "game", title: "soccer game", color: "#37a388", start: "2026-11-03", end: "2026-11-03" },
+      { id: "cross", title: "Bridge", color: "#54bda1", start: "2026-10-30", end: "2026-11-02" },
+      { id: "later", title: "December", color: "#c0d1a4", start: "2026-12-01", end: "2026-12-02" }
+    ], 2026, 11);
+    if (away.label !== "November 2026") errors.push("away label");
+    if (away.days !== 11) errors.push("away unique " + away.days);
+    if (away.plans.length !== 3) errors.push("away count");
+    if (away.plans[0].id !== "cross" || away.plans[0].start !== "2026-11-01" || away.plans[0].end !== "2026-11-02" || away.plans[0].days !== 2) {
+      errors.push("away clip");
+    }
+    if (away.plans[1].id !== "game" || away.plans[1].days !== 1) errors.push("away single");
+    if (away.plans[2].id !== "nish" || away.plans[2].days !== 8 || away.plans[2].start !== "2026-11-17") errors.push("away inside");
+    var none = monthAwayDetail([], 2026, 2);
+    if (none.days !== 0 || none.plans.length !== 0 || none.label !== "February 2026") errors.push("away empty");
     return errors;
   }
 
@@ -692,6 +807,8 @@ var Planner = (function () {
     plansOutsideRange: plansOutsideRange,
     mergePlans: mergePlans,
     isSingleDay: isSingleDay,
+    singleMarkerReserve: singleMarkerReserve,
+    placeNear: placeNear,
     daysInMonth: daysInMonth,
     weekday: weekday,
     weekdayLetter: weekdayLetter,
@@ -701,6 +818,7 @@ var Planner = (function () {
     monthsInRange: monthsInRange,
     segmentInMonth: segmentInMonth,
     monthDaysAway: monthDaysAway,
+    monthAwayDetail: monthAwayDetail,
     layoutMonths: layoutMonths,
     segmentsFor: segmentsFor,
     layout: layout,
