@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.1.6
+
+- Rename the web app manifest to `app.webmanifest` so the repository has a single plugin `manifest.json` at its root, as the Omarchy marketplace requires.
+
 ## 1.1.5
 
 - Pin to desktop takes about a second instead of half a minute. The board page asked the desktop helper for the pin state while it was being rendered, and the helper waited for the render to finish. Status no longer waits, and the render never asks.

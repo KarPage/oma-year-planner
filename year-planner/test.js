@@ -27,7 +27,7 @@ if (!versionMatch) {
   process.exit(1);
 }
 var version = versionMatch[1];
-var manifest = JSON.parse(fs.readFileSync(path.join(__dirname, "manifest.json"), "utf8"));
+var manifest = JSON.parse(fs.readFileSync(path.join(__dirname, "app.webmanifest"), "utf8"));
 if (manifest.version !== version) {
   console.error("manifest version");
   process.exit(1);
