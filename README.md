@@ -1,9 +1,7 @@
-# Omarki
+# Oma Year Planner
 
-Small, fast, local-first apps for Omarchy. No backend, no accounts, no tracking.
+A one-glance whole-year calendar for trips and plans, made for Omarchy. Local-first: no backend, no accounts, no tracking. Vanilla HTML/CSS/JS with no build step.
 
-| App | What it is |
-| --- | --- |
-| [year-planner](year-planner/) | One-glance whole-year calendar for trips and plans. Vanilla HTML/CSS/JS, no build step. |
+The app lives in [year-planner/](year-planner/).
 
-Each app lives in its own folder and runs on its own.
+Working name. Alternatives under consideration: Oma Year, Omi Year, Om Year Plan.
