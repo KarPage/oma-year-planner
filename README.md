@@ -1,4 +1,4 @@
-# Year planner
+# Oma Year Planner
 
 A scrolling year board for plans and trips. It is one HTML page, a stylesheet, and a few plain scripts. There is no build step and no runtime dependencies.
 

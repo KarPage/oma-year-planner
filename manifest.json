@@ -1,6 +1,6 @@
 {
-  "name": "Year planner",
-  "short_name": "Planner",
+  "name": "Oma Year Planner",
+  "short_name": "Oma Year",
   "description": "A scrolling year board for plans and trips.",
   "start_url": "./index.html",
   "scope": "./",
