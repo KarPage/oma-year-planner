@@ -20,4 +20,27 @@ if (errors.length) {
   process.exit(1);
 }
 
+var versionFile = fs.readFileSync(path.join(__dirname, "version.js"), "utf8");
+var versionMatch = versionFile.match(/var VERSION = "([^"]+)"/);
+if (!versionMatch) {
+  console.error("VERSION missing");
+  process.exit(1);
+}
+var version = versionMatch[1];
+var manifest = JSON.parse(fs.readFileSync(path.join(__dirname, "manifest.json"), "utf8"));
+if (manifest.version !== version) {
+  console.error("manifest version");
+  process.exit(1);
+}
+var pkg = JSON.parse(fs.readFileSync(path.join(__dirname, "package.json"), "utf8"));
+if (pkg.version !== version) {
+  console.error("package version");
+  process.exit(1);
+}
+var worker = fs.readFileSync(path.join(__dirname, "sw.js"), "utf8");
+if (worker.indexOf('importScripts("version.js")') === -1 || worker.indexOf('"year-planner-v" + VERSION') === -1) {
+  console.error("service worker version");
+  process.exit(1);
+}
+
 console.log("selfCheck ok");

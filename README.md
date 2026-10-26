@@ -1,39 +1,55 @@
 # Year planner
 
-A single-page year board in vanilla JavaScript. No dependencies, no CDN, and no build step.
+A scrolling year board for plans and trips. It is one HTML page, a stylesheet, and a few plain scripts. There is no build step and no runtime dependencies.
 
-Plans stay in `localStorage` under `year-planner/v1`. Attached images live in IndexedDB so a backup of the plan list does not have to carry the image bytes. Existing plans in that key keep loading.
+Your data stays on your device. Plans are saved in this browser under `year-planner/v1`. Images are saved in IndexedDB, not in that plan list. Nothing is sent to a server.
+
+Screenshots for a release live in [screenshots/](screenshots/).
 
 ## Features
 
-- One scrolling board from this year through next year. A plan can extend that window by up to two years before the current year and three years after it. Plans further out stay in your data and still turn up in search. Rolling 12 still scrolls so the current month sits at the top.
-- Add a plan by clicking a day twice and then another day, by dragging across days, or with Add plan. While the range is in progress, a label by the pointer and the Add plan bar both show the inclusive length, such as `Feb 21 – Mar 6 · 14 days`.
-- A plan that starts and ends on the same day is a thin line at the bottom of the cell. Several on one day stack, and past three a small `+N` stands in for the rest. Hover lists them. Click opens a list to pick or edit one. Multi-day bars keep their usual shape and sit above those lines.
-- Drag a bar to move it. Drag either end to resize it.
-- Scroll a month with the wheel (it snaps to each month), by dragging the month names or a year divider, with Up and Down when no day is focused, or with Shift+Up and Shift+Down when one is. Page Up and Page Down move about six months. Home and End jump to the ends of the board.
-- On a wide window the day columns use the full width. Below about 1000px the layout tightens: single weekday letters, a wrapping dashboard strip, month names like `Jan`, and trip labels that keep a short `·Nd`. All 31 days and the Away column fit without horizontal scrolling down to about 640px.
-- Notes, links, and up to four images per plan.
-- Search, undo, and a dashboard strip for counts, the next plan, and the last trip. The next and last line scrolls only when it overflows, and it stays still when motion is reduced. `/` focuses search. Esc clears it, then blurs.
-- JSON backup and `.ics` import and export. Import asks before it replaces the current list, and it can merge instead. A merged plan whose id is already in the list is skipped when the title, dates, category, note, and color match, and kept as a second copy with a new id when they do not.
-- Keyboard: `T` today, `[` `]` January of the previous or next year, Left and Right move the focused day, Up and Down move it by a month (or scroll the board, see above), `N` new plan, `/` search, `Esc` clears the search then blurs it, `Ctrl`+`Z` undo, `?` help.
-- Offline shell via `sw.js` when the page is served over http or https. Pages and scripts load from the network first and fall back to the cache, so an update shows up without clearing site data.
-- Colors, including the selection tint and the resize handles, come from `theme.css`. The browser theme color and the manifest colors follow `--bg`. On Omarchy, `./open` refreshes that file from the active theme before launching the window.
+- Months run in one scrolling board. The day numbers stay pinned. A year label sits between December and January.
+- Rolling 12 starts at the current month. The year arrows jump to January.
+- Drag across days to add a plan, or click a day twice. Drag a bar to move it, or drag its ends to resize it.
+- A plan is a Trip, an Event, or a Reminder. Older plans with no type are treated as a trip when they cover more than one day, and as an event when they cover one day.
+- Days away counts trips only. That number is on the dashboard, at the end of each month, and in the Away popover.
+- One-day plans are small markers. Click one to edit the name, color, or type. A checklist can show progress on the bar, such as `Canada · 8d · 3/7`.
+- Notes can contain links. Up to four images can be attached. They are shrunk before they are stored.
+- Search, undo, and a wide-screen strip for this month and the next three plans.
+- JSON backup, with or without images, and `.ics` import and export. A file over 20 MB is refused. Import can replace the list or merge into it.
+- Colors come from `theme.css`. On Omarchy, `./open` refreshes that file from the active theme.
 
 ## Run
 
-Open `index.html` in a browser, or from this folder:
+Open `index.html` in a browser.
+
+To install it or use it offline, serve the folder. A `file://` address cannot register the service worker.
 
 ```sh
-python3 -m http.server
+./serve
 ```
 
-Then visit `http://localhost:8000`.
-
-On this machine, `./open` rewrites `theme.css` from the active Omarchy theme and opens the page in its own window.
+Then open `http://localhost:8080`.
 
 ```sh
-python3 apply-theme.py
 node test.js
 ```
 
-`node test.js` runs `Planner.selfCheck` and exits non-zero if a date or layout check fails.
+## Keyboard
+
+| Key | Action |
+| --- | --- |
+| T | Today |
+| N | New plan |
+| / | Search |
+| ? or Shift+/ | Shortcuts |
+| Arrows | Move the focused day, or scroll months |
+| Page Up / Page Down | About six months |
+| Home / End | Ends of the board |
+| Enter | Edit |
+| Esc | Close |
+| Ctrl+Z | Undo |
+
+## Privacy
+
+Plans, notes, checklists, and images never leave the browser unless you export a file yourself. The page does not load fonts, scripts, or images from the network.

@@ -1,13 +1,18 @@
-/* Offline shell for the year planner. Registered from http and https only.
-   HTML, CSS, and JS are network-first so a refresh picks up edits.
-   The cache name changes when this strategy changes so an older
-   cache-first worker drops its copies on activate. */
-var CACHE = "year-planner-v3";
+/* Offline shell. Registered from http and https only.
+   Network first, then the cache, so a refresh picks up edits. */
+importScripts("version.js");
+var CACHE = "year-planner-v" + VERSION;
 var FILES = [
   "./",
   "./index.html",
-  "./app.js",
+  "./app.css",
+  "./version.js",
   "./planner.js",
+  "./store.js",
+  "./board.js",
+  "./popovers.js",
+  "./editor.js",
+  "./app.js",
   "./theme.css",
   "./manifest.json",
   "./icon.svg"

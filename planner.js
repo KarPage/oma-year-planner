@@ -203,6 +203,32 @@ var Planner = (function () {
     return plan.start === end;
   }
 
+  var PLAN_TYPES = { Trip: true, Event: true, Reminder: true };
+
+  /* Missing type: multi-day is a trip, one day is an event. */
+  function planType(plan) {
+    if (plan && PLAN_TYPES[plan.type]) return plan.type;
+    return isSingleDay(plan) ? "Event" : "Trip";
+  }
+
+  function isTrip(plan) {
+    return planType(plan) === "Trip";
+  }
+
+  function countTrips(plans) {
+    var n = 0;
+    (plans || []).forEach(function (plan) { if (isTrip(plan)) n += 1; });
+    return n;
+  }
+
+  function checklistProgress(plan) {
+    var list = plan && Array.isArray(plan.checklist) ? plan.checklist : [];
+    if (!list.length) return null;
+    var done = 0;
+    list.forEach(function (item) { if (item && item.done) done += 1; });
+    return { done: done, total: list.length };
+  }
+
   /* Room the multi-day bars leave for single-day pills.
      7px pill, 2px gap, 3px inset from the cell bottom, 3px clearance.
      At most three pills, then a +N. */
@@ -298,7 +324,8 @@ var Planner = (function () {
 
   function daysAway(plans, year) {
     var seen = Object.create(null);
-    plans.forEach(function (plan) {
+    (plans || []).forEach(function (plan) {
+      if (!isTrip(plan)) return;
       eachDay(plan, year, function (ms) {
         seen[ms] = true;
       });
@@ -349,7 +376,7 @@ var Planner = (function () {
     var to = y + "-" + pad(m) + "-" + pad(dim);
     var rows = [];
     (plans || []).forEach(function (plan) {
-      if (!plan || !parse(plan.start) || !parse(plan.end)) return;
+      if (!isTrip(plan) || !plan || !parse(plan.start) || !parse(plan.end)) return;
       var start = plan.start < plan.end ? plan.start : plan.end;
       var end = plan.end < plan.start ? plan.start : plan.end;
       if (end < from || start > to) return;
@@ -381,7 +408,8 @@ var Planner = (function () {
     var dim = daysInMonth(y, m);
     var from = y + "-" + pad(m) + "-01";
     var to = y + "-" + pad(m) + "-" + pad(dim);
-    plans.forEach(function (plan) {
+    (plans || []).forEach(function (plan) {
+      if (!isTrip(plan)) return;
       var start = plan.start < from ? from : plan.start;
       var end = plan.end > to ? to : plan.end;
       if (plan.end < from || plan.start > to || end < start) return;
@@ -508,8 +536,21 @@ var Planner = (function () {
     var legacy = LEGACY_TAGS[raw.category];
     if (!tag && legacy) tag = legacy.tag;
     if (!color && legacy) color = legacy.color;
-    if (!tag) tag = "Plan";
     if (!color) color = "#74a869";
+    var type = PLAN_TYPES[raw.type] ? raw.type : "";
+    var checklist = [];
+    if (Array.isArray(raw.checklist)) {
+      raw.checklist.forEach(function (item) {
+        if (!item || typeof item !== "object" || checklist.length >= 40) return;
+        var text = String(item.text || "").trim().slice(0, 200);
+        if (!text) return;
+        checklist.push({
+          id: item.id ? String(item.id).slice(0, 40) : "",
+          text: text,
+          done: !!item.done
+        });
+      });
+    }
     var images = [];
     if (Array.isArray(raw.images)) {
       raw.images.forEach(function (item) {
@@ -521,16 +562,45 @@ var Planner = (function () {
         });
       });
     }
-    return {
+    var plan = {
       id: raw.id ? String(raw.id) : "",
-      title: title.slice(0, 80),
+      title: title.slice(0, 200),
       tag: tag.slice(0, 24),
       color: color,
-      note: String(raw.note || "").trim().slice(0, 4000),
+      note: String(raw.note || "").trim().slice(0, 5000),
       images: images,
       start: startIso,
       end: endIso
     };
+    if (type) plan.type = type;
+    if (checklist.length) plan.checklist = checklist;
+    return plan;
+  }
+
+  function makePlan(base, patch) {
+    var src = base && typeof base === "object" ? base : {};
+    var over = patch && typeof patch === "object" ? patch : {};
+    function pick(key) {
+      if (Object.prototype.hasOwnProperty.call(over, key)) return over[key];
+      return src[key];
+    }
+    return normalize({
+      id: pick("id"),
+      title: pick("title"),
+      tag: pick("tag"),
+      type: pick("type"),
+      color: pick("color"),
+      note: pick("note"),
+      checklist: pick("checklist"),
+      images: pick("images"),
+      start: pick("start"),
+      end: pick("end"),
+      category: pick("category")
+    });
+  }
+
+  function backupTooLarge(bytes) {
+    return bytes > 20 * 1024 * 1024;
   }
 
   function selfCheck() {
@@ -775,13 +845,61 @@ var Planner = (function () {
       { id: "later", title: "December", color: "#c0d1a4", start: "2026-12-01", end: "2026-12-02" }
     ], 2026, 11);
     if (away.label !== "November 2026") errors.push("away label");
-    if (away.days !== 11) errors.push("away unique " + away.days);
-    if (away.plans.length !== 3) errors.push("away count");
+    if (away.days !== 10) errors.push("away unique " + away.days);
+    if (away.plans.length !== 2) errors.push("away count " + away.plans.length);
     if (away.plans[0].id !== "cross" || away.plans[0].start !== "2026-11-01" || away.plans[0].end !== "2026-11-02" || away.plans[0].days !== 2) {
       errors.push("away clip");
     }
-    if (away.plans[1].id !== "game" || away.plans[1].days !== 1) errors.push("away single");
-    if (away.plans[2].id !== "nish" || away.plans[2].days !== 8 || away.plans[2].start !== "2026-11-17") errors.push("away inside");
+    if (away.plans[1].id !== "nish" || away.plans[1].days !== 8 || away.plans[1].start !== "2026-11-17") errors.push("away inside");
+    var typed = [
+      { title: "Ski", start: "2026-03-01", end: "2026-03-03" },
+      { title: "Dentist", start: "2026-03-04", end: "2026-03-04" },
+      { title: "Day trip", start: "2026-03-10", end: "2026-03-10", type: "Trip" },
+      { title: "Pack", start: "2026-03-06", end: "2026-03-08", type: "Reminder" }
+    ];
+    if (countTrips(typed) !== 2) errors.push("trip count " + countTrips(typed));
+    if (daysAway(typed, 2026) !== 4) errors.push("trip days " + daysAway(typed, 2026));
+    if (monthDaysAway(typed, 2026, 3) !== 4) errors.push("trip month " + monthDaysAway(typed, 2026, 3));
+    var march = monthAwayDetail(typed, 2026, 3);
+    if (march.plans.length !== 2 || march.plans[0].title !== "Ski" || march.plans[1].title !== "Day trip") {
+      errors.push("trip detail");
+    }
+    var old = normalize({ title: "Old", start: "2026-06-02", end: "2026-06-01", tag: "" });
+    if (!old || old.end !== "2026-06-02" || old.start !== "2026-06-02") errors.push("end before start");
+    if (old.type) errors.push("old type stored");
+    if (old.tag === "Plan") errors.push("default tag");
+    if (planType(old) !== "Event") errors.push("infer event");
+    var oldTrip = normalize({ title: "Old trip", start: "2026-06-01", end: "2026-06-04" });
+    if (oldTrip.type) errors.push("old trip type stored");
+    if (planType(oldTrip) !== "Trip") errors.push("infer trip");
+    if (filterPlans([old], "2026-01-01", "2026-12-31", "all", "plan").length !== 0) errors.push("search plan");
+    var listed = normalize({
+      title: "Pack",
+      start: "2026-07-01",
+      end: "2026-07-02",
+      type: "Trip",
+      checklist: [
+        { id: "a", text: "Passport", done: true },
+        { text: "  ", done: false },
+        { id: "b", text: "Socks", done: false }
+      ]
+    });
+    if (!listed || listed.type !== "Trip" || !listed.checklist || listed.checklist.length !== 2) errors.push("checklist keep");
+    var progress = checklistProgress(listed);
+    if (!progress || progress.done !== 1 || progress.total !== 2) errors.push("checklist progress");
+    if (checklistProgress(old)) errors.push("checklist empty");
+    var renamed = makePlan({ title: "A", start: "2026-01-01", end: "2026-01-03", type: "Trip" }, { title: "B" });
+    if (!renamed || renamed.title !== "B" || renamed.start !== "2026-01-01" || planType(renamed) !== "Trip") {
+      errors.push("makePlan");
+    }
+    var longTitle = "";
+    var longNote = "";
+    for (var i = 0; i < 250; i++) longTitle += "t";
+    for (var j = 0; j < 5200; j++) longNote += "n";
+    var capped = normalize({ title: longTitle, note: longNote, start: "2026-08-01", end: "2026-08-01" });
+    if (!capped || capped.title.length !== 200 || capped.note.length !== 5000) errors.push("length caps");
+    if (backupTooLarge(20 * 1024 * 1024)) errors.push("20mb allowed");
+    if (!backupTooLarge(20 * 1024 * 1024 + 1)) errors.push("20mb rejected");
     var none = monthAwayDetail([], 2026, 2);
     if (none.days !== 0 || none.plans.length !== 0 || none.label !== "February 2026") errors.push("away empty");
     return errors;
@@ -807,6 +925,12 @@ var Planner = (function () {
     plansOutsideRange: plansOutsideRange,
     mergePlans: mergePlans,
     isSingleDay: isSingleDay,
+    planType: planType,
+    isTrip: isTrip,
+    countTrips: countTrips,
+    checklistProgress: checklistProgress,
+    makePlan: makePlan,
+    backupTooLarge: backupTooLarge,
     singleMarkerReserve: singleMarkerReserve,
     placeNear: placeNear,
     daysInMonth: daysInMonth,
