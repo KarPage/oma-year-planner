@@ -1,14 +1,15 @@
 #!/usr/bin/env python3
-"""Write theme.css from the active Omarchy theme.
+"""Write theme.local.css from the active Omarchy theme.
 
 Reads ~/.local/state/omarchy/current/theme/colors.toml and emits CSS
 variables the year planner uses. Re-run after a theme change, or use ./open
-which does this before launching the window.
+which does this before launching the window. The output is gitignored, so a
+git checkout (or an Omarchy plugin install) stays clean. theme.css loads it
+after theme-defaults.css.
 """
 
 from __future__ import annotations
 
-import json
 import re
 import tomllib
 from pathlib import Path
@@ -16,8 +17,7 @@ from pathlib import Path
 THEME_DIR = Path.home() / ".local/state/omarchy/current/theme"
 COLORS = THEME_DIR / "colors.toml"
 NAME = THEME_DIR.parent / "theme.name"
-OUT = Path(__file__).with_name("theme.css")
-MANIFEST = Path(__file__).with_name("manifest.json")
+OUT = Path(__file__).with_name("theme.local.css")
 
 # Page tokens, in order. Each falls through toml keys until one exists.
 ALIASES = {
@@ -100,12 +100,6 @@ def main() -> None:
     lines.append("}")
     lines.append("")
     OUT.write_text("\n".join(lines))
-    bg = pick(colors, ALIASES["bg"], fallbacks["bg"])
-    if MANIFEST.exists():
-        manifest = json.loads(MANIFEST.read_text())
-        manifest["background_color"] = bg
-        manifest["theme_color"] = bg
-        MANIFEST.write_text(json.dumps(manifest, indent=2) + "\n")
     print(f"{OUT}  ({theme_name}, {mode})")
 
 
