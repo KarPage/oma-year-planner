@@ -643,11 +643,6 @@ function onPointerCancel() {
   render();
 }
 
-window.addEventListener("pointermove", onArmMove);
-window.addEventListener("pointermove", onPointerMove);
-window.addEventListener("pointerup", onPointerUp);
-window.addEventListener("pointercancel", onPointerCancel);
-
 board.addEventListener("click", function (event) {
   var awayHead = event.target.closest && event.target.closest(".away-head");
   if (awayHead) {
