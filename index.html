@@ -268,6 +268,19 @@
         <label id="start-field"><span id="start-label">Starts</span><input id="f-start" type="date" required></label>
         <label id="end-field">Ends<input id="f-end" type="date"></label>
       </div>
+      <div class="when-row">
+        <button type="button" id="all-day" aria-pressed="true">All day</button>
+        <div class="time-fields" id="time-fields" hidden>
+          <label>Starts<input id="f-time" type="time"></label>
+          <label>Ends<input id="f-end-time" type="time"></label>
+        </div>
+      </div>
+      <label class="where-field">Where?
+        <span class="where-row">
+          <input id="f-where" type="text" maxlength="120" placeholder="Optional">
+          <a id="f-maps" hidden target="_blank" rel="noopener noreferrer">Maps</a>
+        </span>
+      </label>
       <div class="segment" role="group" aria-label="Type">
         <button type="button" class="type-btn" data-type="Trip" aria-pressed="true">Trip</button>
         <button type="button" class="type-btn" data-type="Event" aria-pressed="false">Event</button>

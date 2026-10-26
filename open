@@ -5,7 +5,7 @@ cd "$(dirname "$0")" || exit 1
 ROOT=$(pwd)
 
 # file:// pages cannot run wallpaper themselves. This listens on 127.0.0.1 only.
-if ! curl -sf -o /dev/null --max-time 0.4 http://127.0.0.1:47321/status; then
+if ! curl -sf -o /dev/null --max-time 0.4 -H 'Origin: null' http://127.0.0.1:47321/status; then
   setsid "$ROOT/bridge" >/dev/null 2>&1 < /dev/null &
 fi
 

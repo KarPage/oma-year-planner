@@ -164,7 +164,14 @@ function dashEvent(which, plan, days, soon) {
     unit.textContent = soon ? (days === 1 ? "day" : "days") : "days ago";
     row.append(num, unit);
     var lead = which === "up" ? "Up next: " : (which === "last" ? "Last: " : "Next: ");
-    button.title = lead + plan.title + " " + dayPhrase(days, soon);
+    var detail = planWhenText(plan);
+    button.title = lead + plan.title + " " + dayPhrase(days, soon) + (detail ? " · " + detail : "");
+    if (detail) {
+      var meta = document.createElement("span");
+      meta.className = "meta";
+      meta.textContent = detail;
+      row.append(meta);
+    }
   } else {
     button.disabled = true;
   }
@@ -186,8 +193,7 @@ function soonCell(plan, today) {
   days.className = "days";
   days.textContent = Planner.diffDays(today, plan.start) + "d";
   button.append(when, days, name);
-  var meta = plan.time || plan.location || "";
-  if (plan.time && plan.location) meta = plan.time + " · " + plan.location;
+  var meta = planWhenText(plan);
   if (meta) {
     var line = document.createElement("span");
     line.className = "meta";
@@ -209,7 +215,8 @@ function lastLine(plan, today) {
     return button;
   }
   button.textContent = "Last · " + plan.title + " · " + Planner.diffDays(plan.end, today) + "d ago";
-  button.title = "Last: " + plan.title;
+  var lastDetail = planWhenText(plan);
+  button.title = "Last: " + plan.title + (lastDetail ? " · " + lastDetail : "");
   return button;
 }
 
@@ -611,14 +618,22 @@ function dotCaption(plan) {
   return word.slice(0, 7);
 }
 
+function planWhenText(plan) {
+  if (!plan) return "";
+  var clock = plan.time || "";
+  if (plan.time && plan.endTime) clock = plan.time + "–" + plan.endTime;
+  if (clock && plan.location) return clock + " · " + plan.location;
+  return clock || plan.location || "";
+}
+
 function planAria(plan, extra) {
   var when = plan.start === plan.end
     ? shortDate(plan.start)
     : shortDate(plan.start) + " to " + shortDate(plan.end);
   var bits = [plan.title, when];
   if (extra) bits.push(extra);
-  if (plan.time) bits.push(plan.time);
-  if (plan.location) bits.push(plan.location);
+  var detail = planWhenText(plan);
+  if (detail) bits.push(detail);
   return bits.join(", ");
 }
 
@@ -677,7 +692,10 @@ function syncTips() {
     var iso = cell.dataset.date;
     var parts = Planner.parse(iso);
     var when = Planner.weekdayLetter(parts.y, parts.m, parts.d) + " " + parts.d + " " + Planner.MONTHS[parts.m - 1] + " " + parts.y;
-    var names = plansOn(iso).map(function (plan) { return plan.title; });
+    var names = plansOn(iso).map(function (plan) {
+      var detail = planWhenText(plan);
+      return detail ? plan.title + " (" + detail + ")" : plan.title;
+    });
     cell.title = names.length ? when + " · " + names.join(", ") : when;
   });
 }

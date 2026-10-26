@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.1.1
+
+- The desktop helper accepts only the planner page: a local file, or the page served at localhost port 8080. Any other origin is refused.
+- A plan can carry a start and end time, or stay all day, plus an optional place. The place opens in Maps only when that link is clicked. Times and places travel with the calendar file and with Google Calendar.
+
 ## 1.1.0
 
 - Past plan titles stay readable. Narrow screens give Up next the room up to the search icon.
