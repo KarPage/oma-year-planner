@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Plan bars are solid, with a duration pill. One- and two-day plans are dots. The board scrollbar stays hidden.
 - Optional read-only Google Calendar connect. Events stay in this browser. Disconnect removes them.
 - Today centers the current month and day. The header keyboard button opens help.
 - The year grid stays within the window. Today centers the month vertically only.

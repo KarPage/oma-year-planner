@@ -135,7 +135,7 @@ function paintQuickSwatches(plan) {
   var row = document.getElementById("qe-swatches");
   if (!row) return;
   row.replaceChildren();
-  ["--travel", "--work", "--personal", "--other", "--accent", "--range"].forEach(function (name) {
+  ["--accent", "--travel", "--work", "--personal", "--other", "--range"].forEach(function (name) {
     var hex = themeSwatch(name);
     if (!hex) return;
     var button = document.createElement("button");

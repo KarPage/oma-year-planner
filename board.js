@@ -394,8 +394,9 @@ function googleMark() {
   return svg;
 }
 
-function singleStackHeight(count) {
-  return Planner.singleMarkerReserve(count);
+function themeHex(name) {
+  var value = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  return /^#[0-9a-fA-F]{6}$/.test(value) ? value : "";
 }
 
 function syncBars() {
@@ -410,13 +411,27 @@ function syncBars() {
     if (!groups[iso]) groups[iso] = [];
     groups[iso].push(seg);
   });
-  var monthReserve = Object.create(null);
-  Object.keys(groups).forEach(function (iso) {
-    var ym = iso.slice(0, 7);
-    var height = singleStackHeight(groups[iso].length);
-    if (!monthReserve[ym] || height > monthReserve[ym]) monthReserve[ym] = height;
-  });
+  var themeInk = {
+    fg: themeHex("--fg") || "#fcfff4",
+    bg: themeHex("--bg") || "#000d04",
+    muted: themeHex("--muted"),
+    raised: themeHex("--bg-raised"),
+    sun: themeHex("--personal")
+  };
+  function inkFor(color, past) {
+    var which = Planner.barInk(color || "#74a869", themeInk.fg, themeInk.bg, {
+      muted: themeInk.muted,
+      raised: themeInk.raised,
+      sun: themeInk.sun,
+      past: !!past
+    });
+    return {
+      color: which === "bg" ? "var(--bg)" : "var(--fg)",
+      kind: which === "bg" ? "ink-dark" : "ink-light"
+    };
+  }
   var tooled = {};
+  var today = todayIso();
   laid.bars.forEach(function (bar) {
     var plan = bar.plan;
     var host = board.querySelector('.month[data-ym="' + bar.y + "-" + Planner.pad(bar.month) + '"]');
@@ -424,12 +439,17 @@ function syncBars() {
     var el = document.createElement("button");
     el.type = "button";
     el.className = "bar";
+    var past = plan.end < today;
+    var span = bar.endDay - bar.startDay + 1;
     if (bar.continuesBefore) el.classList.add("cont-before");
     if (bar.continuesAfter) el.classList.add("cont-after");
+    if (past) el.classList.add("is-past");
+    if (span <= 2 && !bar.continuesBefore && !bar.continuesAfter) el.classList.add("is-brief");
     if (plan.id === selectedId) el.classList.add("selected");
+    var ink = inkFor(plan.color, past);
+    el.classList.add(ink.kind);
     el.style.setProperty("--cat", plan.color || "#74a869");
     var ym = bar.y + "-" + Planner.pad(bar.month);
-    el.style.setProperty("--singles", (monthReserve[ym] || 0) + "px");
     el.style.gridColumn = (bar.startDay + 1) + " / " + (bar.endDay + 2);
     el.style.gridRow = host.dataset.row;
     el.style.setProperty("--lane", String(bar.lane));
@@ -442,6 +462,7 @@ function syncBars() {
 
     var fill = document.createElement("span");
     fill.className = "fill";
+    fill.style.color = ink.color;
     if (bar.continuesBefore) {
       var before = document.createElement("span");
       before.className = "edge";
@@ -453,14 +474,10 @@ function syncBars() {
     text.textContent = plan.title;
     var count = document.createElement("span");
     count.className = "count";
-    var countFull = document.createElement("span");
-    countFull.className = "count-full";
-    var progressBit = progress ? " · " + progress.done + "/" + progress.total : "";
-    countFull.textContent = " · " + bar.days + "d" + progressBit;
-    var countShort = document.createElement("span");
-    countShort.className = "count-short";
-    countShort.textContent = "·" + bar.days + "d" + (progress ? "·" + progress.done + "/" + progress.total : "");
-    count.append(countFull, countShort);
+    var pill = document.createElement("span");
+    pill.className = "pill";
+    pill.textContent = bar.days + "d";
+    count.append(pill);
     fill.append(text, count);
     if (bar.continuesAfter) {
       var after = document.createElement("span");
@@ -497,6 +514,7 @@ function syncBars() {
       var tick = document.createElement("button");
       tick.type = "button";
       tick.className = "bar single";
+      if (plan.end < today) tick.classList.add("is-past");
       if (plan.id === selectedId) tick.classList.add("selected");
       tick.style.setProperty("--cat", plan.color || "#74a869");
       tick.style.setProperty("--slot", String(i));
@@ -549,7 +567,7 @@ function syncTotals() {
 
 /* Drop "·Nd" before the name truncates. Full title and days stay on the bar tooltip. */
 function fitBarLabels() {
-  board.querySelectorAll(".bar:not(.single) .fill").forEach(function (fill) {
+  board.querySelectorAll(".bar:not(.single):not(.is-brief) .fill").forEach(function (fill) {
     var label = fill.querySelector(".label");
     var count = fill.querySelector(".count");
     if (!label || !count) return;

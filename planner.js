@@ -92,6 +92,72 @@ var Planner = (function () {
     return nameScroll <= nameClient + 1;
   }
 
+  function hexRgb(hex) {
+    if (typeof hex !== "string" || !/^#[0-9a-fA-F]{6}$/.test(hex)) return null;
+    return [
+      parseInt(hex.slice(1, 3), 16),
+      parseInt(hex.slice(3, 5), 16),
+      parseInt(hex.slice(5, 7), 16)
+    ];
+  }
+
+  function mixRgb(a, b, t) {
+    return [
+      a[0] * t + b[0] * (1 - t),
+      a[1] * t + b[1] * (1 - t),
+      a[2] * t + b[2] * (1 - t)
+    ];
+  }
+
+  function channelLum(c) {
+    var x = c / 255;
+    return x <= 0.04045 ? x / 12.92 : Math.pow((x + 0.055) / 1.055, 2.4);
+  }
+
+  function relLum(rgb) {
+    return 0.2126 * channelLum(rgb[0]) + 0.7152 * channelLum(rgb[1]) + 0.0722 * channelLum(rgb[2]);
+  }
+
+  function contrast(a, b) {
+    var hi = Math.max(relLum(a), relLum(b));
+    var lo = Math.min(relLum(a), relLum(b));
+    return (hi + 0.05) / (lo + 0.05);
+  }
+
+  /* "fg" is the light theme text and "bg" is the dark ground.
+     A current bar is 76% of the plan color over the cell. A past bar
+     pulls that color toward muted, then toward the background.
+     The result is whichever ink clears WCAG AA on the fill. */
+  function barInk(catHex, fgHex, bgHex, extras) {
+    var cat = hexRgb(catHex);
+    var fg = hexRgb(fgHex);
+    var bg = hexRgb(bgHex);
+    if (!cat || !fg || !bg) return "fg";
+    extras = extras || {};
+    var fgMin = Infinity;
+    var bgMin = Infinity;
+    var muted = hexRgb(extras.muted) || [84, 87, 84];
+    if (extras.past) {
+      var pastFill = mixRgb(mixRgb(cat, muted, 0.58), bg, 0.72);
+      fgMin = contrast(pastFill, fg);
+      bgMin = contrast(pastFill, bg);
+    } else {
+      var backs = [bg];
+      var raised = hexRgb(extras.raised);
+      if (raised) backs.push(mixRgb(raised, bg, 0.35));
+      var sun = hexRgb(extras.sun);
+      if (sun && raised) backs.push(mixRgb(sun, backs[backs.length - 1], 0.04));
+      backs.forEach(function (back) {
+        var fill = mixRgb(cat, back, 0.76);
+        fgMin = Math.min(fgMin, contrast(fill, fg));
+        bgMin = Math.min(bgMin, contrast(fill, bg));
+      });
+    }
+    if (bgMin >= 4.5 && bgMin >= fgMin) return "bg";
+    if (fgMin >= 4.5) return "fg";
+    return bgMin > fgMin ? "bg" : "fg";
+  }
+
   function importStatus(mode, added, importedCount, identical, skipped, singular) {
     var one = singular || "plan";
     var parts = [];
@@ -229,9 +295,7 @@ var Planner = (function () {
     return { done: done, total: list.length };
   }
 
-  /* Room the multi-day bars leave for single-day pills.
-     7px pill, 2px gap, 3px inset from the cell bottom, 3px clearance.
-     At most three pills, then a +N. */
+  /* Old bottom-pill stack height. The board draws dots and does not inset bars by this. */
   function singleMarkerReserve(count) {
     var shown = Math.min(Math.max(0, count | 0), 3);
     if (!shown) return 0;
@@ -1008,6 +1072,16 @@ var Planner = (function () {
     if (singleMarkerReserve(1) !== 13) errors.push("marker reserve one");
     if (singleMarkerReserve(3) !== 31) errors.push("marker reserve three");
     if (singleMarkerReserve(8) !== 31) errors.push("marker reserve cap");
+    var inkFg = "#fcfff4";
+    var inkBg = "#000d04";
+    var inkExtra = { raised: "#171f1a", muted: "#545754", sun: "#c0d1a4" };
+    if (barInk("#74a869", inkFg, inkBg, inkExtra) !== "bg") errors.push("ink travel");
+    if (barInk("#41a468", inkFg, inkBg, inkExtra) !== "fg") errors.push("ink accent");
+    if (barInk("#c0d1a4", inkFg, inkBg, inkExtra) !== "bg") errors.push("ink personal");
+    if (barInk("#f8fc31", inkFg, inkBg, inkExtra) !== "bg") errors.push("ink yellow");
+    if (barInk("#74a869", inkFg, inkBg, { muted: "#545754", past: true }) !== "fg") errors.push("ink past");
+    if (barInk("#f8fc31", inkFg, inkBg, { muted: "#545754", past: true }) !== "bg") errors.push("ink past yellow");
+    if (barInk("nope", inkFg, inkBg) !== "fg") errors.push("ink bad");
     var below = placeNear(
       { left: 20, top: 40, bottom: 60 },
       { width: 120, height: 80 },
@@ -1206,6 +1280,7 @@ var Planner = (function () {
     prettyDate: prettyDate,
     plural: plural,
     barKeepsDayCount: barKeepsDayCount,
+    barInk: barInk,
     importStatus: importStatus,
     rangeCountLabel: rangeCountLabel,
     rollingRange: rollingRange,

@@ -302,7 +302,7 @@ function paintEditorSwatches() {
   var row = document.getElementById("f-swatches");
   if (!row) return;
   row.replaceChildren();
-  ["--travel", "--work", "--personal", "--other", "--accent", "--range"].forEach(function (name) {
+  ["--accent", "--travel", "--work", "--personal", "--other", "--range"].forEach(function (name) {
     var hex = themeSwatch(name);
     if (!hex) return;
     var button = document.createElement("button");
@@ -385,7 +385,7 @@ function openEditor(plan, defaults, focusNote) {
   editingId = plan ? plan.id : null;
   formError.textContent = "";
   titleInput.value = plan ? plan.title : "";
-  colorInput.value = plan && plan.color ? plan.color : (themeSwatch("--travel") || "#74a869");
+  colorInput.value = plan && plan.color ? plan.color : (themeSwatch("--accent") || "#41a468");
   var start = plan ? plan.start : (defaults && defaults.start) || cellDate(year, todayParts().m, todayParts().d);
   var end = plan ? plan.end : (defaults && defaults.end) || start;
   if (!plan && defaults && defaults.single) end = start;
