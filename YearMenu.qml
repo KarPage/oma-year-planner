@@ -223,35 +223,58 @@ Panel {
         Item { Layout.fillWidth: true; implicitHeight: Style.space(4) }
         Rectangle { Layout.fillWidth: true; implicitHeight: 1; color: Util.alpha(panel.fg, 0.12) }
 
-        // Quit: a solid danger button.
+        // Quit: a quiet outlined danger button. Faint red tint at rest,
+        // stronger tint and a full red border on hover or press.
         Item {
           Layout.fillWidth: true
-          implicitHeight: Style.space(44)
+          implicitHeight: panel.rowHeight + Style.space(14)
           Rectangle {
             id: quitButton
             readonly property bool usable: panel.actions[4].enabled
             readonly property bool hot: usable && (quitMouse.containsMouse || panel.cursor === 4)
+            readonly property bool down: usable && quitMouse.pressed
+            readonly property color ink: Qt.tint(panel.fg, Util.alpha(panel.danger, 0.4))
             anchors.fill: parent
-            anchors.margins: Style.space(6)
-            color: !usable ? Util.alpha(panel.danger, 0.25) : (hot ? Qt.lighter(panel.danger, 1.25) : panel.danger)
-            Row {
-              anchors.centerIn: parent
-              spacing: Style.space(8)
-              Text {
-                text: "\uf011"
-                color: quitButton.usable ? "#ffffff" : Util.alpha("#ffffff", 0.5)
-                font.family: panel.fontFamily
-                font.pixelSize: Style.font.bodySmall + 1
-                anchors.verticalCenter: parent.verticalCenter
-              }
-              Text {
-                text: quitButton.usable ? "Quit Year Planner" : "Not running"
-                color: quitButton.usable ? "#ffffff" : Util.alpha("#ffffff", 0.5)
-                font.family: panel.fontFamily
-                font.pixelSize: Style.font.bodySmall + 1
-                font.bold: true
-                anchors.verticalCenter: parent.verticalCenter
-              }
+            anchors.leftMargin: Style.space(6)
+            anchors.rightMargin: Style.space(6)
+            anchors.topMargin: Style.space(7)
+            anchors.bottomMargin: Style.space(7)
+            radius: 0
+            color: !usable ? "transparent"
+                 : Util.alpha(panel.danger, down ? 0.32 : (hot ? 0.22 : 0.10))
+            border.width: 1
+            border.color: !usable ? Util.alpha(panel.fg, 0.15)
+                        : (hot ? panel.danger : Util.alpha(panel.danger, 0.55))
+            Text {
+              id: quitGlyph
+              x: Style.space(6)
+              width: Style.space(18)
+              anchors.verticalCenter: parent.verticalCenter
+              horizontalAlignment: Text.AlignHCenter
+              text: "\uf011"
+              color: quitButton.usable ? panel.danger : Util.alpha(panel.fg, 0.3)
+              font.family: panel.fontFamily
+              font.pixelSize: Style.font.bodySmall + 1
+            }
+            Text {
+              anchors.left: quitGlyph.right
+              anchors.leftMargin: Style.space(8)
+              anchors.verticalCenter: parent.verticalCenter
+              text: quitButton.usable ? "Quit Year Planner" : "Not running"
+              color: quitButton.usable ? quitButton.ink : Util.alpha(panel.fg, 0.35)
+              font.family: panel.fontFamily
+              font.pixelSize: Style.font.bodySmall + 1
+            }
+            Text {
+              anchors.right: parent.right
+              anchors.rightMargin: Style.space(6)
+              anchors.verticalCenter: parent.verticalCenter
+              visible: quitButton.usable
+              text: "Q"
+              color: quitButton.hot ? quitButton.ink : Util.alpha(panel.danger, 0.45)
+              font.family: panel.fontFamily
+              font.pixelSize: Style.font.caption
+              font.bold: true
             }
             MouseArea {
               id: quitMouse
