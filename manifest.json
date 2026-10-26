@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "io.github.karpage.oma-year",
   "name": "Oma Year Planner",
-  "version": "1.1.0",
+  "version": "1.1.2",
   "author": "KarPage",
   "license": "MIT",
   "description": "Your whole year on one screen. A local-first year calendar that follows your Omarchy theme. No backend, no account, no build step.",
@@ -14,7 +14,7 @@
   },
   "barWidget": {
     "displayName": "Oma Year Planner",
-    "description": "Left-click opens the planner. Right-click pins it to the wallpaper.",
+    "description": "Left-click opens a menu: open, pin, full screen, refresh, quit. Right-click pins or unpins it on the wallpaper.",
     "category": "Productivity",
     "aliases": [
       "year",
