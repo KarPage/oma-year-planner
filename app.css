@@ -147,6 +147,8 @@ h1.today-headline {
   min-width: 0;
   min-height: 52px;
   overflow: hidden;
+  container-type: inline-size;
+  container-name: strip;
 }
 #rhythm { display: contents; }
 .dash-group {
@@ -160,6 +162,28 @@ h1.today-headline {
 #rhythm .dash-group {
   flex: 1 1 0;
   min-width: 0;
+}
+#rhythm .dash-group.is-next { flex: 1.6 1 0; }
+#rhythm .dash-group.is-up { flex: 1.15 1 0; }
+#rhythm .dash-group.is-soon { display: none; }
+#rhythm .dash-group.is-last {
+  flex: 0 1 auto;
+  margin-left: auto;
+  max-width: 18rem;
+}
+.last-cell { display: none; }
+.last-line {
+  flex-direction: row;
+  align-items: center;
+  width: auto;
+  max-width: 18rem;
+  padding: 0;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 650;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 #dash-extra { display: none; }
 .stats {
@@ -390,6 +414,35 @@ h1.today-headline {
   text-transform: uppercase;
   color: var(--muted);
 }
+.dash-event.last-line {
+  flex-direction: row;
+  align-items: center;
+  width: auto;
+  max-width: 18rem;
+  padding: 0;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 650;
+  white-space: nowrap;
+}
+.dash-event.last-cell .name { color: var(--fg-dim); }
+.dash-event.last-cell .num {
+  font-size: 14px;
+  color: var(--muted);
+  text-shadow: none;
+}
+.dash-event.last-cell .unit {
+  font-size: 11px;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--muted);
+  text-shadow: none;
+}
+.dash-event.last-cell { display: none; }
+@container strip (min-width: 1560px) {
+  .dash-event.last-line { display: none; }
+  .dash-event.last-cell { display: flex; }
+}
 .dash-up {
   flex: 0 0 280px;
   width: 280px;
@@ -449,7 +502,86 @@ h1.today-headline {
   color: var(--muted);
   font-size: 12px;
 }
-.dash .search { margin-left: 8px; }
+.dash .search { margin-left: 8px; flex: none; }
+.soon-row {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+}
+.soon-cell {
+  flex: 1 1 0;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 1px 8px;
+  padding: 4px 8px;
+  border: 1px solid var(--line);
+  border-radius: 0;
+  background: transparent;
+  color: var(--fg);
+  font: inherit;
+  text-align: left;
+}
+.soon-cell .when {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 650;
+  color: var(--accent);
+}
+.soon-cell .days {
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 650;
+  color: var(--accent);
+  text-shadow:
+    0 0 6px color-mix(in srgb, var(--accent) 70%, transparent),
+    0 0 12px color-mix(in srgb, var(--accent) 24%, transparent);
+}
+.soon-cell .name,
+.soon-cell .meta {
+  grid-column: 1 / -1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.soon-cell .name { font-size: 13px; font-weight: 700; }
+.soon-cell .meta { color: var(--muted); font-size: 11px; }
+.is-soon {
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: center;
+  gap: 3px;
+}
+.is-soon > .k {
+  font-family: var(--mono);
+  font-size: 9px;
+  font-weight: 650;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+  line-height: 1;
+}
+.last-cell {
+  color: var(--muted);
+}
+.last-cell .name { color: var(--fg-dim); font-weight: 700; }
+.last-cell .num,
+.last-cell .unit {
+  color: var(--muted);
+  text-shadow: none;
+  font-size: 14px;
+}
+@container strip (min-width: 1560px) {
+  #rhythm .dash-group.is-up { display: none; }
+  #rhythm .dash-group.is-soon { display: flex; flex: 1.7 1 0; }
+  #rhythm .dash-group.is-next { flex: 1.15 1 0; }
+  #rhythm .dash-group.is-last { margin-left: 0; flex: 0 0 13rem; max-width: 13rem; }
+  .last-line { display: none; }
+  .last-cell { display: flex; }
+}
 .range-note {
   margin: 0;
   padding: 3px 12px 4px;
@@ -665,6 +797,13 @@ label.search input::placeholder {
 .month.now .name, .month.now .num {
   color: color-mix(in srgb, var(--today) 85%, transparent);
 }
+.month.is-gone {
+  background: transparent;
+}
+.month.is-gone .name,
+.month.is-gone .num {
+  color: color-mix(in srgb, var(--fg) 40%, var(--bg));
+}
 
 .cell, .month, .month-total { min-width: 0; height: var(--month-h); }
 .cell { position: relative; overflow: hidden; }
@@ -721,8 +860,15 @@ label.search input::placeholder {
 }
 .month-total.zero { color: var(--muted); font-weight: 500; }
 .cell.weekend { background: color-mix(in srgb, var(--sun) 4%, transparent); }
-.cell.past { background: color-mix(in srgb, var(--bg-deep) 28%, transparent); }
-.cell.past .wd { color: var(--muted); }
+.cell.past,
+.cell.past.weekend {
+  background: color-mix(in srgb, var(--bg-deep) 46%, transparent);
+}
+.cell.past .wd,
+.cell.past .wd.sun {
+  color: color-mix(in srgb, var(--fg) 40%, var(--bg));
+  font-weight: 500;
+}
 .cell.today::after {
   content: "";
   position: absolute;
@@ -816,12 +962,22 @@ label.search input::placeholder {
   -webkit-font-smoothing: antialiased;
   overflow: hidden;
 }
-.bar.is-past:not(.is-brief):not(.single) .fill {
-  background: color-mix(in srgb, var(--cat, var(--accent)) 14%, transparent);
-  border-color: color-mix(in srgb, var(--cat, var(--accent)) 38%, transparent);
-  box-shadow:
-    inset 3px 0 0 color-mix(in srgb, var(--cat, var(--accent)) 48%, transparent),
-    inset 0 1px 0 color-mix(in srgb, white 14%, transparent);
+.bar.is-now .fill {
+  background: linear-gradient(90deg,
+    color-mix(in srgb, var(--cat, var(--accent)) 42%, transparent) var(--progress, 0%),
+    color-mix(in srgb, var(--cat, var(--accent)) 25%, transparent) var(--progress, 0%));
+}
+.bar.is-past .fill {
+  filter: grayscale(0.85);
+  opacity: 0.45;
+}
+.bar.is-past .pill {
+  color: var(--muted);
+  border-color: color-mix(in srgb, var(--muted) 80%, transparent);
+}
+.bar.is-next:not(.is-brief):not(.single) .fill {
+  outline: 1px solid var(--accent);
+  outline-offset: -1px;
 }
 .g-mark { width: 14px; height: 14px; display: block; flex: none; }
 .bar:not(.single) .g-mark { width: 10px; height: 10px; margin-right: 4px; }
@@ -879,11 +1035,14 @@ label.search input::placeholder {
     inset 3px 0 0 var(--cat, var(--accent)),
     inset 0 1px 0 color-mix(in srgb, white 40%, transparent);
 }
+.bar.is-now:hover .fill {
+  background: linear-gradient(90deg,
+    color-mix(in srgb, var(--cat, var(--accent)) 50%, transparent) var(--progress, 0%),
+    color-mix(in srgb, var(--cat, var(--accent)) 35%, transparent) var(--progress, 0%));
+}
 .bar.is-past:hover .fill {
-  background: color-mix(in srgb, var(--cat, var(--accent)) 20%, transparent);
-  box-shadow:
-    inset 3px 0 0 color-mix(in srgb, var(--cat, var(--accent)) 55%, transparent),
-    inset 0 1px 0 color-mix(in srgb, white 18%, transparent);
+  filter: grayscale(0.85);
+  opacity: 0.55;
 }
 .bar.selected .fill {
   outline: 2px solid color-mix(in srgb, var(--cat, var(--accent)) 82%, white);
@@ -942,8 +1101,14 @@ label.search input::placeholder {
 }
 .bar.is-brief.is-past .fill,
 .bar.single.is-past .fill {
-  background: color-mix(in srgb, var(--cat, var(--accent)) 42%, var(--muted));
+  filter: grayscale(0.85);
+  opacity: 0.45;
   box-shadow: 0 0 0 1px var(--bg);
+}
+.bar.single.is-next .fill,
+.bar.is-brief.is-next .fill {
+  outline: 1px solid var(--accent);
+  outline-offset: 2px;
 }
 .plan-tools {
   display: none;
@@ -1698,7 +1863,6 @@ textarea {
 
 
 @media (max-width: 1280px) {
-  .dash-group.is-up { display: none; }
   .today-line { font-size: 26px; }
   .dash-event .num { font-size: 22px; }
   .stat-box b { font-size: 18px; }

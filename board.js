@@ -172,6 +172,47 @@ function dashEvent(which, plan, days, soon) {
   return button;
 }
 
+function soonCell(plan, today) {
+  var button = document.createElement("button");
+  button.type = "button";
+  button.className = "soon-cell";
+  var when = document.createElement("span");
+  when.className = "when";
+  when.textContent = shortDate(plan.start);
+  var name = document.createElement("span");
+  name.className = "name";
+  name.textContent = plan.title;
+  var days = document.createElement("b");
+  days.className = "days";
+  days.textContent = Planner.diffDays(today, plan.start) + "d";
+  button.append(when, days, name);
+  var meta = plan.time || plan.location || "";
+  if (plan.time && plan.location) meta = plan.time + " · " + plan.location;
+  if (meta) {
+    var line = document.createElement("span");
+    line.className = "meta";
+    line.textContent = meta;
+    button.append(line);
+  }
+  button.addEventListener("click", function () { focusPlan(plan); });
+  return button;
+}
+
+function lastLine(plan, today) {
+  var button = document.createElement("button");
+  button.type = "button";
+  button.className = "dash-event last-line";
+  button.dataset.which = "last";
+  if (!plan) {
+    button.textContent = "Last · none";
+    button.disabled = true;
+    return button;
+  }
+  button.textContent = "Last · " + plan.title + " · " + Planner.diffDays(plan.end, today) + "d ago";
+  button.title = "Last: " + plan.title;
+  return button;
+}
+
 function renderRhythm() {
   var today = todayIso();
   var past = null;
@@ -185,6 +226,7 @@ function renderRhythm() {
   });
   var future = futures[0] || null;
   var up = futures[1] || null;
+  var after = futures.slice(1, 4);
   rhythmNext = future;
   rhythmUp = up;
   rhythmLast = past;
@@ -193,16 +235,36 @@ function renderRhythm() {
   host.replaceChildren();
   function group(which, plan, soon) {
     var node = document.createElement("div");
-    node.className = "dash-group" + (which === "up" ? " is-up" : "");
+    node.className = "dash-group is-" + which;
     var days = plan ? Planner.diffDays(soon ? today : plan.end, soon ? plan.start : today) : 0;
     node.append(dashEvent(which, plan, days, soon));
     return node;
   }
-  host.append(
-    group("next", future, true),
-    group("up", up, true),
-    group("last", past, false)
-  );
+  var soon = document.createElement("div");
+  soon.className = "dash-group is-soon";
+  var soonLabel = document.createElement("span");
+  soonLabel.className = "k";
+  soonLabel.textContent = "Upcoming";
+  var row = document.createElement("div");
+  row.className = "soon-row";
+  if (!after.length) {
+    var empty = document.createElement("span");
+    empty.className = "dash-empty";
+    empty.textContent = "None";
+    row.append(empty);
+  } else {
+    after.forEach(function (plan) { row.append(soonCell(plan, today)); });
+  }
+  soon.append(soonLabel, row);
+  var last = document.createElement("div");
+  last.className = "dash-group is-last";
+  var lastDays = past ? Planner.diffDays(past.end, today) : 0;
+  var lastCell = dashEvent("last", past, lastDays, false);
+  lastCell.classList.add("last-cell");
+  var lastUnit = lastCell.querySelector(".unit");
+  if (lastUnit) lastUnit.textContent = "d ago";
+  last.append(lastLine(past, today), lastCell);
+  host.append(group("next", future, true), group("up", up, true), soon, last);
 }
 
 function fitMarquee() {}
@@ -318,6 +380,7 @@ function buildGrid() {
     label.className = "month";
     label.dataset.ym = key;
     label.dataset.row = String(row);
+    if (key < today.slice(0, 7)) label.classList.add("is-gone");
     if (key === today.slice(0, 7)) label.classList.add("now");
     var monthNum = document.createElement("span");
     monthNum.className = "num";
@@ -409,10 +472,16 @@ function syncBars() {
     el.type = "button";
     el.className = "bar";
     var past = plan.end < today;
+    var ongoing = plan.start <= today && plan.end >= today;
     var span = bar.endDay - bar.startDay + 1;
     if (bar.continuesBefore) el.classList.add("cont-before");
     if (bar.continuesAfter) el.classList.add("cont-after");
     if (past) el.classList.add("is-past");
+    if (ongoing) {
+      el.classList.add("is-now");
+      el.style.setProperty("--progress", segmentProgress(bar, today) + "%");
+    }
+    if (rhythmNext && plan.id === rhythmNext.id) el.classList.add("is-next");
     if (span <= 2 && !bar.continuesBefore && !bar.continuesAfter) el.classList.add("is-brief");
     if (plan.id === selectedId) el.classList.add("selected");
     el.style.setProperty("--cat", plan.color || "#74a869");
@@ -495,6 +564,7 @@ function syncBars() {
       if (mini) tick.classList.add("is-mini");
       if (plan.end < today) tick.classList.add("is-past");
       if (iso === today) tick.classList.add("is-today");
+      if (rhythmNext && plan.id === rhythmNext.id) tick.classList.add("is-next");
       if (plan.id === selectedId) tick.classList.add("selected");
       tick.style.setProperty("--cat", plan.color || "#74a869");
       tick.style.setProperty("--slot", String(i));
@@ -517,6 +587,17 @@ function syncBars() {
       calendar.append(tick);
     }
   });
+}
+
+function segmentProgress(bar, today) {
+  var span = bar.endDay - bar.startDay + 1;
+  if (span < 1) return 0;
+  var segStart = cellDate(bar.y, bar.month, bar.startDay);
+  var segEnd = cellDate(bar.y, bar.month, bar.endDay);
+  var done = 0;
+  if (today >= segEnd) done = span;
+  else if (today >= segStart) done = Planner.diffDays(segStart, today) + 1;
+  return Math.max(0, Math.min(100, Math.round(done / span * 100)));
 }
 
 function dotCaption(plan) {

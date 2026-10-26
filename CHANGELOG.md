@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- The dashboard switches with the window: Up next on a narrow screen, three upcoming cells when wide. Past months and finished plans fade back.
 - The day header stays pinned while the months scroll. The dashboard adds an Up next box beside Next.
 - Sharp terminal chrome. Next and Last are flat neon counts. One-day marks are dots with a short label.
 - The dashboard is four groups: counts, Next, Last, and a short Upcoming list.
