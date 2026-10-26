@@ -1,6 +1,29 @@
 #!/bin/sh
 # Refresh colors from the active Omarchy theme, then open the year planner
-# as its own window.
+# as its own window. An open planner is focused instead of opened twice.
 cd "$(dirname "$0")" || exit 1
+ROOT=$(pwd)
+
+if command -v hyprctl >/dev/null 2>&1; then
+  if hyprctl eval '
+    local target
+    for _, w in ipairs(hl.get_windows()) do
+      local class = w.class or ""
+      if class:find("year%-planner") and class:find("index%.html") then
+        target = w
+        break
+      end
+    end
+    if not target then error("no-planner") end
+    hl.dispatch(hl.dsp.focus({ window = target }))
+  ' >/dev/null 2>&1; then
+    exit 0
+  fi
+fi
+
 python3 ./apply-theme.py
-exec chromium --app="file://$(pwd)/index.html"
+chromium --app="file://$ROOT/index.html"
+code=$?
+"$ROOT/wallpaper" refresh >/dev/null 2>&1 || true
+exit "$code"
+

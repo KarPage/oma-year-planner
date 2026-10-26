@@ -505,6 +505,190 @@ var Planner = (function () {
     return /^#[0-9a-fA-F]{6}$/.test(text) ? text.toLowerCase() : "";
   }
 
+  /* Theme swatches used when the page has not painted computed colors. */
+  var THEME_SWATCHES = ["#74a869", "#37a388", "#c0d1a4", "#54bda1", "#41a468", "#e6d48a"];
+
+  function rgbOf(hex) {
+    var color = hexColor(hex);
+    if (!color) return null;
+    return [
+      parseInt(color.slice(1, 3), 16),
+      parseInt(color.slice(3, 5), 16),
+      parseInt(color.slice(5, 7), 16)
+    ];
+  }
+
+  function nearestSwatch(hex, palette) {
+    var list = [];
+    var source = palette && palette.length ? palette : THEME_SWATCHES;
+    source.forEach(function (item) {
+      var color = hexColor(item);
+      if (color) list.push(color);
+    });
+    if (!list.length) list = THEME_SWATCHES.slice();
+    var rgb = rgbOf(hex);
+    if (!rgb) return list[0];
+    var best = list[0];
+    var bestDistance = Infinity;
+    list.forEach(function (color) {
+      var other = rgbOf(color);
+      var distance = (rgb[0] - other[0]) * (rgb[0] - other[0])
+        + (rgb[1] - other[1]) * (rgb[1] - other[1])
+        + (rgb[2] - other[2]) * (rgb[2] - other[2]);
+      if (distance < bestDistance) {
+        bestDistance = distance;
+        best = color;
+      }
+    });
+    return best;
+  }
+
+  function gcalPlain(value) {
+    var text = String(value || "").replace(/\r\n/g, "\n");
+    text = text.replace(/<script[\s\S]*?<\/script>/gi, "");
+    text = text.replace(/<style[\s\S]*?<\/style>/gi, "");
+    text = text.replace(/<br\s*\/?>/gi, "\n");
+    text = text.replace(/<\/p>/gi, "\n");
+    text = text.replace(/<[^>]*>/g, "");
+    text = text.replace(/&nbsp;/gi, " ");
+    text = text.replace(/&amp;/gi, "&");
+    text = text.replace(/&lt;/gi, "<");
+    text = text.replace(/&gt;/gi, ">");
+    text = text.replace(/&quot;/gi, "\"");
+    text = text.replace(/&#0*39;|&#x0*27;/gi, "'");
+    text = text.replace(/[ \t]+\n/g, "\n");
+    text = text.replace(/\n{3,}/g, "\n\n");
+    return text.trim();
+  }
+
+  function gcalSafeLink(url) {
+    var text = String(url || "").trim().slice(0, 2000);
+    if (!/^https:\/\/(www\.google\.com|calendar\.google\.com)\//i.test(text)) return "";
+    return text;
+  }
+
+  function gcalPoint(point, exclusiveEnd) {
+    if (!point || typeof point !== "object") return "";
+    if (point.date && parse(point.date)) {
+      return exclusiveEnd ? addDays(point.date, -1) : point.date;
+    }
+    var stamp = String(point.dateTime || "");
+    var match = stamp.match(/^(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2})/);
+    if (!match || !parse(match[1])) return "";
+    if (exclusiveEnd && match[2] === "00" && match[3] === "00") return addDays(match[1], -1);
+    return match[1];
+  }
+
+  function gcalSpan(event) {
+    var start = gcalPoint(event && event.start, false);
+    if (!start) return null;
+    var end = gcalPoint(event && event.end, true);
+    if (!end || end < start) end = start;
+    return { start: start, end: end, days: inclusiveDays(start, end) };
+  }
+
+  var GCAL_TAGS = {
+    fromGmail: "Gmail",
+    outOfOffice: "Out of office",
+    focusTime: "Focus",
+    workingLocation: "Location",
+    birthday: "Birthday"
+  };
+
+  function gcalTag(event) {
+    var typed = event && GCAL_TAGS[event.eventType];
+    if (typed) return typed;
+    var source = event && event.source && event.source.title;
+    return source ? gcalPlain(source).slice(0, 24) : "";
+  }
+
+  function gcalKey(calendar, event) {
+    var cal = calendar && calendar.id ? String(calendar.id) : "";
+    var id = event && event.id ? String(event.id) : "";
+    if (!cal || !id) return "";
+    return (cal + ":" + id).slice(0, 400);
+  }
+
+  function gcalEventToPlan(event, calendar, palette) {
+    if (!event || event.status === "cancelled") return null;
+    var key = gcalKey(calendar, event);
+    var span = gcalSpan(event);
+    if (!key || !span) return null;
+    var title = gcalPlain(event.summary) || "Busy";
+    var location = gcalPlain(event.location);
+    var description = gcalPlain(event.description);
+    var note = location && description ? location + "\n" + description : (location || description);
+    var color = nearestSwatch(calendar && calendar.backgroundColor, palette);
+    return normalize({
+      id: "gcal-" + key,
+      title: title,
+      tag: gcalTag(event),
+      type: span.days >= 2 ? "Trip" : "Event",
+      color: color,
+      note: note,
+      start: span.start,
+      end: span.end,
+      source: "gcal",
+      gcalId: key,
+      etag: event.etag || "",
+      htmlLink: event.htmlLink || "",
+      gcalCal: calendar && calendar.id ? String(calendar.id) : ""
+    });
+  }
+
+  function applyGcalChanges(plans, events, calendar, palette) {
+    var next = (plans || []).slice();
+    var removed = 0;
+    var upserted = 0;
+    (events || []).forEach(function (event) {
+      if (!event || typeof event !== "object") return;
+      var key = gcalKey(calendar, event);
+      if (!key) return;
+      var index = -1;
+      for (var i = 0; i < next.length; i++) {
+        if (next[i] && next[i].gcalId === key) {
+          index = i;
+          break;
+        }
+      }
+      if (event.status === "cancelled") {
+        if (index >= 0) {
+          next.splice(index, 1);
+          removed += 1;
+        }
+        return;
+      }
+      var plan = gcalEventToPlan(event, calendar, palette);
+      if (!plan) return;
+      if (index >= 0) {
+        plan.id = next[index].id || plan.id;
+        next[index] = plan;
+      } else {
+        next.push(plan);
+      }
+      upserted += 1;
+    });
+    return { plans: next, removed: removed, upserted: upserted };
+  }
+
+  function gcalSyncedCaption(at, now) {
+    var then = +at;
+    var clock = +now;
+    if (!then || !clock || clock < then) return "Not synced yet";
+    var mins = Math.round((clock - then) / 60000);
+    if (mins < 1) return "Synced just now";
+    if (mins === 1) return "Synced 1 min ago";
+    return "Synced " + mins + " min ago";
+  }
+
+  function gcalNeedsFullSync(status) {
+    return status === 410;
+  }
+
+  function gcalTokenRejected(status) {
+    return status === 401 || status === 403;
+  }
+
   function filterPlans(plans, fromIso, toIso, tag, query) {
     var q = String(query || "").trim().toLowerCase();
     return plans.filter(function (plan) {
@@ -574,6 +758,12 @@ var Planner = (function () {
     };
     if (type) plan.type = type;
     if (checklist.length) plan.checklist = checklist;
+    if (raw.source === "gcal") plan.source = "gcal";
+    if (raw.gcalId) plan.gcalId = String(raw.gcalId).slice(0, 400);
+    if (raw.etag) plan.etag = String(raw.etag).slice(0, 200);
+    var link = gcalSafeLink(raw.htmlLink);
+    if (link) plan.htmlLink = link;
+    if (raw.gcalCal) plan.gcalCal = String(raw.gcalCal).slice(0, 320);
     return plan;
   }
 
@@ -595,7 +785,12 @@ var Planner = (function () {
       images: pick("images"),
       start: pick("start"),
       end: pick("end"),
-      category: pick("category")
+      category: pick("category"),
+      source: pick("source"),
+      gcalId: pick("gcalId"),
+      etag: pick("etag"),
+      htmlLink: pick("htmlLink"),
+      gcalCal: pick("gcalCal")
     });
   }
 
@@ -902,6 +1097,98 @@ var Planner = (function () {
     if (!backupTooLarge(20 * 1024 * 1024 + 1)) errors.push("20mb rejected");
     var none = monthAwayDetail([], 2026, 2);
     if (none.days !== 0 || none.plans.length !== 0 || none.label !== "February 2026") errors.push("away empty");
+    var swatches = ["#74a869", "#37a388", "#c0d1a4", "#54bda1"];
+    if (nearestSwatch("#37a388", swatches) !== "#37a388") errors.push("swatch exact");
+    if (nearestSwatch("#36a287", swatches) !== "#37a388") errors.push("swatch near");
+    var dirty = gcalPlain("Cafe\n<img src=x onerror=alert(1)>Hello <b>there</b><script>alert(1)</script> &amp; go");
+    if (dirty !== "Cafe\nHello there & go") errors.push("gcal plain " + JSON.stringify(dirty));
+    var calendar = { id: "primary", backgroundColor: "#74a869" };
+    var flight = {
+      id: "e1",
+      etag: "\"w\"",
+      status: "confirmed",
+      summary: "<b>Flight</b>",
+      location: "SFO",
+      description: "<p>Gate 12</p>",
+      htmlLink: "https://www.google.com/calendar/event?eid=abc",
+      eventType: "fromGmail",
+      start: { dateTime: "2026-07-01T09:00:00-07:00" },
+      end: { dateTime: "2026-07-01T11:00:00-07:00" }
+    };
+    var mapped = gcalEventToPlan(flight, calendar);
+    if (!mapped || mapped.type !== "Event" || mapped.title !== "Flight" || mapped.tag !== "Gmail") errors.push("gcal event");
+    if (!mapped || mapped.note !== "SFO\nGate 12" || mapped.source !== "gcal" || mapped.gcalId !== "primary:e1") errors.push("gcal note");
+    if (!mapped || mapped.htmlLink.indexOf("https://www.google.com/calendar/") !== 0) errors.push("gcal link");
+    var week = gcalEventToPlan({
+      id: "trip",
+      status: "confirmed",
+      summary: "Coast",
+      start: { date: "2026-06-01" },
+      end: { date: "2026-06-05" }
+    }, calendar);
+    if (!week || week.type !== "Trip" || week.start !== "2026-06-01" || week.end !== "2026-06-04") errors.push("gcal trip");
+    var oneDay = gcalEventToPlan({
+      id: "day",
+      status: "confirmed",
+      summary: "Holiday",
+      start: { date: "2026-06-01" },
+      end: { date: "2026-06-02" }
+    }, calendar);
+    if (!oneDay || oneDay.type !== "Event" || oneDay.start !== oneDay.end) errors.push("gcal allday");
+    var span = gcalEventToPlan({
+      id: "span",
+      status: "confirmed",
+      summary: "Drive",
+      start: { dateTime: "2026-08-01T10:00:00-07:00" },
+      end: { dateTime: "2026-08-03T10:00:00-07:00" }
+    }, calendar);
+    if (!span || span.type !== "Trip" || span.end !== "2026-08-03") errors.push("gcal multiday");
+    var unsafe = gcalEventToPlan({
+      id: "bad",
+      status: "confirmed",
+      summary: "Nope",
+      htmlLink: "javascript:alert(1)",
+      start: { date: "2026-06-01" },
+      end: { date: "2026-06-02" }
+    }, calendar);
+    if (!unsafe || unsafe.htmlLink) errors.push("gcal unsafe link");
+    var local = { id: "local", title: "Stay", tag: "Trip", color: "#74a869", start: "2026-07-02", end: "2026-07-04" };
+    var first = applyGcalChanges([local], [flight], calendar);
+    var second = applyGcalChanges(first.plans, [flight], calendar);
+    if (first.plans.length !== 2 || second.plans.length !== 2 || second.upserted !== 1) errors.push("gcal dupe");
+    if (second.plans[1].id !== first.plans[1].id) errors.push("gcal stable id");
+    var renamedEvent = applyGcalChanges(second.plans, [{
+      id: "e1",
+      status: "confirmed",
+      summary: "Flight home",
+      start: flight.start,
+      end: flight.end
+    }], calendar);
+    if (renamedEvent.plans.length !== 2 || renamedEvent.plans[1].title !== "Flight home" || renamedEvent.plans[1].id !== first.plans[1].id) {
+      errors.push("gcal upsert");
+    }
+    var cleared = applyGcalChanges(renamedEvent.plans, [{ id: "e1", status: "cancelled" }], calendar);
+    if (cleared.removed !== 1 || cleared.plans.length !== 1 || cleared.plans[0].id !== "local") errors.push("gcal cancel");
+    var missing = applyGcalChanges(cleared.plans, [{ id: "nope", status: "cancelled" }], calendar);
+    if (missing.removed !== 0 || missing.plans.length !== 1) errors.push("gcal cancel miss");
+    var kept = makePlan({
+      title: "A",
+      start: "2026-01-01",
+      end: "2026-01-01",
+      source: "gcal",
+      gcalId: "primary:e1",
+      etag: "w",
+      htmlLink: "https://www.google.com/calendar/event?eid=abc",
+      gcalCal: "primary"
+    }, { title: "B" });
+    if (!kept || kept.title !== "B" || kept.source !== "gcal" || kept.gcalId !== "primary:e1" || kept.gcalCal !== "primary") {
+      errors.push("gcal keep");
+    }
+    if (gcalSyncedCaption(0, 1000) !== "Not synced yet") errors.push("gcal caption empty");
+    if (gcalSyncedCaption(80000, 200000) !== "Synced 2 min ago") errors.push("gcal caption");
+    if (gcalSyncedCaption(200000, 200000) !== "Synced just now") errors.push("gcal caption now");
+    if (!gcalNeedsFullSync(410) || gcalNeedsFullSync(200)) errors.push("gcal 410");
+    if (!gcalTokenRejected(401) || gcalTokenRejected(200)) errors.push("gcal 401");
     return errors;
   }
 
@@ -948,6 +1235,13 @@ var Planner = (function () {
     layout: layout,
     filterPlans: filterPlans,
     normalize: normalize,
+    nearestSwatch: nearestSwatch,
+    gcalPlain: gcalPlain,
+    gcalEventToPlan: gcalEventToPlan,
+    applyGcalChanges: applyGcalChanges,
+    gcalSyncedCaption: gcalSyncedCaption,
+    gcalNeedsFullSync: gcalNeedsFullSync,
+    gcalTokenRejected: gcalTokenRejected,
     selfCheck: selfCheck
   };
 })();

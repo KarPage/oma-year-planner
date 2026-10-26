@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- Optional read-only Google Calendar connect. Events stay in this browser. Disconnect removes them.
+- Today centers the current month and day. The header keyboard button opens help.
+- The year grid stays within the window. Today centers the month vertically only.
+- Wallpaper mode. Right-click the bar button to pin the board onto the wallpaper, and again to put your wallpaper back.
+
 ## 1.0.0
 
 - Scrolling year board with trips, events, and reminders.

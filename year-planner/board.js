@@ -34,6 +34,7 @@ function renderChrome() {
   renderRhythm();
   renderRangeNote();
   statsEl.replaceChildren();
+  if (typeof paintGcal === "function") paintGcal();
   figures.forEach(function (pair) {
     var item = document.createElement("div");
     item.className = "stat-box";
@@ -381,6 +382,18 @@ function buildGrid() {
   board.replaceChildren(calendar);
 }
 
+function googleMark() {
+  var svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("class", "g-mark");
+  svg.setAttribute("viewBox", "0 0 16 16");
+  svg.setAttribute("aria-hidden", "true");
+  var path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+  path.setAttribute("fill", "currentColor");
+  path.setAttribute("d", "M8 1.6a6.4 6.4 0 1 0 5.7 9.2H8.1V8.2h6.6A6.4 6.4 0 0 0 8 1.6z");
+  svg.appendChild(path);
+  return svg;
+}
+
 function singleStackHeight(count) {
   return Planner.singleMarkerReserve(count);
 }
@@ -459,11 +472,15 @@ function syncBars() {
     var planEnd = Planner.parse(plan.end);
     var atStart = planStart && planStart.y === bar.y && planStart.m === bar.month && planStart.d === bar.startDay;
     var atEnd = planEnd && planEnd.y === bar.y && planEnd.m === bar.month && planEnd.d === bar.endDay;
-    if (atStart) fill.append(handle("w"));
-    if (atEnd) fill.append(handle("e"));
-    if (!tooled[plan.id]) {
+    if (plan.source !== "gcal" && atStart) fill.append(handle("w"));
+    if (plan.source !== "gcal" && atEnd) fill.append(handle("e"));
+    if (plan.source !== "gcal" && !tooled[plan.id]) {
       tooled[plan.id] = true;
       fill.append(planTools(plan));
+    }
+    if (plan.source === "gcal") {
+      el.classList.add("is-gcal");
+      fill.insertBefore(googleMark(), fill.firstChild);
     }
     el.append(fill);
     calendar.append(el);
@@ -497,6 +514,10 @@ function syncBars() {
       cap.className = "mark-label";
       cap.textContent = plan.title;
       tick.append(mark, cap);
+      if (plan.source === "gcal") {
+        tick.classList.add("is-gcal");
+        tick.append(googleMark());
+      }
       calendar.append(tick);
     }
     if (segs.length > 3) {
@@ -571,6 +592,7 @@ function applySnapPadding() {
 var scrollGen = 0;
 
 function scrollToMonth(y, m, smooth) {
+  board.classList.remove("today-view");
   var label = board.querySelector('.month[data-ym="' + y + "-" + Planner.pad(m) + '"]');
   if (!label) return;
   /* Ceil so a fractional row cannot leave the previous month above the header. */
@@ -579,7 +601,7 @@ function scrollToMonth(y, m, smooth) {
   var reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   var gen = ++scrollGen;
   if (!(smooth && !reduce) || Math.abs(board.scrollTop - top) < 2) {
-    board.scrollTo({ top: top, behavior: "auto" });
+    board.scrollTo({ top: top, behavior: "instant" });
     if (!boardDrag) board.classList.remove("panning");
     return;
   }
@@ -594,6 +616,28 @@ function scrollToMonth(y, m, smooth) {
   }
   board.addEventListener("scrollend", done);
   setTimeout(done, 900);
+}
+
+function centerOnToday(smooth) {
+  var today = todayParts();
+  var month = board.querySelector('.month[data-ym="' + today.y + "-" + Planner.pad(today.m) + '"]');
+  if (!month) return;
+  board.classList.add("today-view");
+  year = today.y;
+  if (yearLabel) yearLabel.textContent = String(today.y);
+  var boardRect = board.getBoundingClientRect();
+  var monthRect = month.getBoundingClientRect();
+  var head = headHeight();
+  var midY = boardRect.top + head + Math.max(0, boardRect.height - head) / 2;
+  var top = board.scrollTop + (monthRect.top + monthRect.height / 2 - midY);
+  var maxTop = Math.max(0, board.scrollHeight - board.clientHeight);
+  if (top < 0) top = 0;
+  if (top > maxTop) top = maxTop;
+  var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  board.scrollTo({
+    top: top,
+    behavior: smooth && !reduce ? "smooth" : "instant"
+  });
 }
 
 function monthAtTopIndex() {
@@ -710,7 +754,11 @@ function endBoardDrag() {
 
 function updateViewYear() {
   var months = board.querySelectorAll(".month");
-  var edge = board.getBoundingClientRect().top + headHeight() + 4;
+  var rect = board.getBoundingClientRect();
+  var head = headHeight();
+  var edge = board.classList.contains("today-view")
+    ? rect.top + head + Math.max(0, rect.height - head) / 2
+    : rect.top + head + 4;
   var found = RANGE_START;
   for (var i = 0; i < months.length; i++) {
     if (months[i].getBoundingClientRect().bottom > edge) {

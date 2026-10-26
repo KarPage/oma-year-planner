@@ -1,0 +1,231 @@
+#!/bin/sh
+# Pin the year board on the desktop wallpaper, or put the old picture back.
+# The board is a still image. Nothing on it can be clicked or moved.
+set -eu
+
+ROOT=$(CDPATH= cd -- "$(dirname "$0")" && pwd)
+STATE=${XDG_STATE_HOME:-$HOME/.local/state}/oma-year
+BG_LINK=$HOME/.local/state/omarchy/current/background
+ORIGINAL=$STATE/original-bg
+CURRENT=$STATE/current
+
+mkdir -p "$STATE"
+exec 9>"$STATE/lock"
+flock -w 90 9
+
+die() {
+  echo "wallpaper: $*" >&2
+  exit 1
+}
+
+current_bg() {
+  if [ -L "$BG_LINK" ] || [ -e "$BG_LINK" ]; then
+    readlink -f "$BG_LINK"
+  fi
+}
+
+saved_render() {
+  if [ -f "$CURRENT" ]; then
+    readlink -f "$(cat "$CURRENT")"
+  fi
+}
+
+is_pinned() {
+  render=$(saved_render || true)
+  now=$(current_bg || true)
+  [ -n "$render" ] && [ -n "$now" ] && [ "$render" = "$now" ]
+}
+
+clear_state() {
+  rm -f "$ORIGINAL" "$CURRENT"
+  rm -f "$STATE"/render-*.png
+}
+
+install_timer() {
+  unit_dir=${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user
+  mkdir -p "$unit_dir"
+  cat > "$unit_dir/oma-year-wallpaper.service" << EOF
+[Unit]
+Description=Refresh the pinned year-planner wallpaper
+
+[Service]
+Type=oneshot
+ExecStart=$ROOT/wallpaper refresh
+EOF
+  cat > "$unit_dir/oma-year-wallpaper.timer" << EOF
+[Unit]
+Description=Refresh the pinned year-planner wallpaper at midnight
+
+[Timer]
+OnCalendar=*-*-* 00:00:00
+Persistent=true
+AccuracySec=1min
+
+[Install]
+WantedBy=timers.target
+EOF
+  systemctl --user daemon-reload >/dev/null
+  systemctl --user enable oma-year-wallpaper.timer >/dev/null 2>&1 || true
+}
+
+render_board() {
+  command -v chromium >/dev/null 2>&1 || die "chromium is not installed"
+  command -v magick >/dev/null 2>&1 || die "ImageMagick (magick) is not installed"
+  command -v hyprctl >/dev/null 2>&1 || die "hyprctl is not installed"
+  [ -f "$ORIGINAL" ] || die "no saved wallpaper"
+  wall=$(cat "$ORIGINAL")
+  [ -f "$wall" ] || die "saved wallpaper is missing: $wall"
+
+  eval "$(hyprctl monitors -j | python3 -c '
+import json, sys
+mons = json.load(sys.stdin)
+pick = next((m for m in mons if m.get("focused")), mons[0] if mons else None)
+if not pick:
+    sys.exit("no monitor")
+w = int(pick["width"])
+h = int(pick["height"])
+scale = float(pick.get("scale") or 1)
+if scale <= 0:
+    scale = 1
+print("W=%d" % w)
+print("H=%d" % h)
+print("SCALE=%s" % scale)
+print("CSS_W=%d" % max(1, round(w / scale)))
+print("CSS_H=%d" % max(1, round(h / scale)))
+')"
+
+  runtime=${XDG_RUNTIME_DIR:-/tmp}
+  work=$(mktemp -d "$runtime/oma-year.XXXXXX")
+  trap 'rm -rf "$work"' EXIT INT TERM
+  app=$work/app
+  profile=$work/profile
+  board=$work/board.png
+  mkdir -p "$app" "$profile/Default/Local Storage/leveldb"
+
+  cp -a "$ROOT/." "$app/"
+  rm -rf "$app/.git"
+  cat > "$app/wallpaper.css" << 'EOF'
+.nav,
+#add,
+.search,
+.foot,
+.action,
+.note-card,
+dialog {
+  display: none !important;
+}
+EOF
+  python3 - "$app/index.html" << 'PY'
+import pathlib, sys
+path = pathlib.Path(sys.argv[1])
+html = path.read_text()
+extra = """<link rel=\"stylesheet\" href=\"wallpaper.css\">
+<script>try{localStorage.setItem(\"year-planner/welcome\",\"1\")}catch(e){}</script>
+"""
+path.write_text(html.replace("</head>", extra + "</head>", 1))
+PY
+
+  src=$HOME/.config/chromium/Default/Local\ Storage/leveldb
+  dest=$profile/Default/Local\ Storage/leveldb
+  if [ -d "$src" ]; then
+    find "$src" -maxdepth 1 -type f ! -name LOCK -exec cp -a {} "$dest/" \;
+  fi
+
+  set +e
+  (
+    cd "$app"
+    chromium \
+      --headless=new \
+      --disable-gpu \
+      --hide-scrollbars \
+      --no-first-run \
+      --disable-sync \
+      --user-data-dir="$profile" \
+      --window-size="${CSS_W},${CSS_H}" \
+      --force-device-scale-factor="$SCALE" \
+      --virtual-time-budget=4000 \
+      --screenshot="$board" \
+      index.html
+  ) >/tmp/oma-year-chromium.log 2>&1
+  shot=$?
+  set -e
+  [ -s "$board" ] || die "chromium screenshot failed ($shot)"
+
+  stamp=$(date +%s%N)
+  out=$STATE/render-$stamp.png
+  magick "$wall" -resize "${W}x${H}^" -gravity center -extent "${W}x${H}" \
+    \( "$board" -resize "${W}x${H}!" -alpha set -channel A -evaluate set 78% +channel \) \
+    -composite "$out"
+  [ -s "$out" ] || die "composite failed"
+
+  rm -rf "$work"
+  trap - EXIT INT TERM
+
+  printf '%s\n' "$out" > "$CURRENT"
+  find "$STATE" -maxdepth 1 -type f -name 'render-*.png' ! -name "render-$stamp.png" -delete
+  omarchy-theme-bg-set "$out" >/dev/null
+  echo "pinned $out"
+}
+
+cmd_pin() {
+  now=$(current_bg || true)
+  render=$(saved_render || true)
+  if [ -z "$now" ]; then
+    die "no current wallpaper"
+  fi
+  if [ -z "$render" ] || [ "$now" != "$render" ]; then
+    printf '%s\n' "$now" > "$ORIGINAL"
+  fi
+  install_timer || echo "wallpaper: midnight timer was not enabled" >&2
+  render_board
+}
+
+cmd_refresh() {
+  if ! is_pinned; then
+    exit 0
+  fi
+  render_board
+}
+
+cmd_unpin() {
+  if is_pinned; then
+    wall=$(cat "$ORIGINAL")
+    [ -f "$wall" ] || die "saved wallpaper is missing: $wall"
+    omarchy-theme-bg-set "$wall" >/dev/null
+    clear_state
+    echo "restored $wall"
+    exec "$ROOT/open"
+  fi
+  clear_state
+  echo "unpinned"
+}
+
+cmd_status() {
+  if is_pinned; then
+    echo "pinned"
+    echo "original  $(cat "$ORIGINAL")"
+    echo "render    $(cat "$CURRENT")"
+  else
+    echo "unpinned"
+  fi
+}
+
+cmd_toggle() {
+  if is_pinned; then
+    cmd_unpin
+  else
+    cmd_pin
+  fi
+}
+
+case ${1:-} in
+  pin) cmd_pin ;;
+  unpin) cmd_unpin ;;
+  toggle) cmd_toggle ;;
+  refresh) cmd_refresh ;;
+  status) cmd_status ;;
+  *)
+    echo "Usage: ./wallpaper pin | unpin | toggle | refresh | status" >&2
+    exit 1
+    ;;
+esac

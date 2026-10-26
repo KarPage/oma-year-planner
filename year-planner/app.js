@@ -47,9 +47,6 @@ document.getElementById("help").addEventListener("close", function () {
   try { localStorage.setItem(WELCOME_KEY, "1"); } catch (err) { /* private mode */ }
 });
 
-document.getElementById("help-btn").addEventListener("click", function () {
-  openHelp("guide");
-});
 document.getElementById("keys-btn").addEventListener("click", function () {
   openHelp("shortcuts");
 });
@@ -137,6 +134,7 @@ function armClock() {
     if (document.hidden) return;
     renderRhythm();
     refreshToday();
+    if (typeof gcalOnMinute === "function") gcalOnMinute();
   }, 60000);
   var now = new Date();
   var nextMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
@@ -180,7 +178,8 @@ function boot() {
   var m = today.m;
   if (y < RANGE_START) { y = RANGE_START; m = 1; }
   if (y > RANGE_END) { y = RANGE_END; m = 12; }
-  scrollToMonth(y, m, false);
+  if (y === today.y) centerOnToday(false);
+  else scrollToMonth(y, m, false);
   updateViewYear();
   armClock();
   var versionNode = document.getElementById("app-version");
@@ -188,6 +187,7 @@ function boot() {
   try {
     if (!savedPlanCount() && localStorage.getItem(WELCOME_KEY) !== "1") openHelp("welcome");
   } catch (err) { /* private mode */ }
+  if (typeof gcalOnBoot === "function") gcalOnBoot();
 }
 hydrateImages().then(boot, boot);
 setTimeout(boot, 800);
@@ -200,6 +200,10 @@ window.addEventListener("resize", function () {
     fitMarquee();
     fitBarLabels();
     if (boardDrag) return;
+    if (board.classList.contains("today-view")) {
+      centerOnToday(false);
+      return;
+    }
     var months = board.querySelectorAll(".month");
     if (!months.length) return;
     var index = monthAtTopIndex();
