@@ -36,7 +36,7 @@ All plans in these shots are demo data.
 | <img src="screenshots/add-plan.png" alt="Add plan dialog filling in F1 Las Vegas Grand Prix" width="460"><br>**Add a plan.** Drag across days or press `N`, then name it, pick the type and color, and add a note. | <img src="screenshots/plan-detail.png" alt="A plan opened on the board with its note and photo" width="460"><br>**Open a plan.** Click a plan to see its note and photos right on the board. |
 | <img src="screenshots/plan-edit.png" alt="Edit plan dialog with a note, checklist and photo" width="460"><br>**Notes, checklists and photos.** Up to four images per plan. | |
 
-The barbecue photo is AI-generated for this demo.
+Barbecue photo: ["Barbecue plate at Black's Barbecue"](https://commons.wikimedia.org/wiki/File:Barbecue_plate_at_Black%27s_Barbecue.jpg) by T.Tseng, [CC BY 2.0](https://creativecommons.org/licenses/by/2.0/), via Wikimedia Commons.
 
 ## Privacy
 
