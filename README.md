@@ -15,11 +15,14 @@
 - **Fast planning.** Drag across days to add a plan, drag a bar to move it, or drag its ends to resize it.
 - **Trips, events and reminders.** One-day plans show as small markers. Trips add up to a "days away" count per month and for the year.
 - **Dashboard strip.** Counts for plans, trips and days away, then Next, Up next and Last. A wide window shows three Upcoming plans. A narrow window keeps Next, Up next and Last on one line.
+- **Time and place.** A plan can be all day or have a start and end time, plus an optional place. The place opens in Maps only when you click it. Times and places go along with calendar files and Google Calendar.
 - **Notes, links, checklists and up to four images per plan.** Checklist progress shows on the bar, for example `Canada · 8d · 3/7`.
+- **Full screen.** The button just left of **+ Add plan**, or the `F` key, toggles full screen. Full screen uses the wide dashboard.
 - **Search** with `/`, **undo** with `Ctrl+Z`, and full keyboard navigation (press `?`).
 - **Backup and calendar files.** Export and import JSON backups, with or without images, and `.ics` calendar files.
 - **Matches your Omarchy theme.** The planner reads the colors from your active theme each time it opens.
-- **Bar button.** Left-click opens the planner. Right-click pins the board on the wallpaper, or puts your wallpaper back.
+- **Bar menu.** Left-click the bar button for a small menu: **Open planner**, **Pin to desktop** (or **Unpin**), **Full screen**, **Refresh desktop snapshot**, and a red **Quit Year Planner** button. Right-click (or middle-click) pins or unpins straight away. A small dot on the button shows while it is pinned.
+- **Quit.** **Quit Year Planner** closes the planner windows and stops the pin helper. It never closes other browser windows, and it leaves a pinned picture and its midnight repaint alone.
 - **Pin to desktop.** A still picture of your year, laid over your wallpaper and painted again at midnight. Pin or unpin it with the **Pin to desktop** button in the header, the `W` key, a right-click on the bar button, or an optional `Super+Shift+Y` shortcut. Nothing on the picture clicks or moves.
 - **Google Calendar, if you want it.** Optional and read-only. It is off by default. You bring your own Google OAuth client id and run `./serve`. See [year-planner/README.md](year-planner/README.md#google-calendar).
 
@@ -44,7 +47,7 @@ Everything stays on your machine.
 - The page makes no network requests unless you connect Google Calendar. Then events come straight from Google to your browser, read-only. Nothing is sent back.
 - Data leaves your device only when you export a file yourself.
 - Wallpaper mode copies Chromium's local storage into a temporary folder so the picture can show your plans. It takes the picture there and deletes the copy.
-- `./open` starts a small helper so the **Pin to desktop** button can work from a local file. It listens only on `127.0.0.1:47321` and accepts only pin, unpin, toggle and status. It keeps running until you log out.
+- `./open` starts a small helper so the **Pin to desktop** button can work from a local file. It listens only on `127.0.0.1:47321` and accepts only pin, unpin, toggle and status. It only answers requests from the planner page itself (`file://` or `localhost:8080`). It keeps running until you log out.
 
 ## Install as an Omarchy plugin
 
@@ -52,7 +55,7 @@ Everything stays on your machine.
 omarchy plugin add https://github.com/KarPage/oma-year-planner --enable
 ```
 
-This adds a calendar button to your bar. Left-click opens the planner in its own app window, themed with your current Omarchy colors. Right-click pins the board onto the wallpaper, or restores your wallpaper. If the button doesn't show up, add **Oma Year Planner** to the bar from the bar settings.
+This adds a calendar button to your bar. Left-click opens a small menu: open the planner in its own app window (themed with your current Omarchy colors), pin or unpin the board on the wallpaper, toggle full screen, refresh the pinned picture, or quit. In the menu, `O`, `W`, `F`, `R` and `Q` do the same, and `Esc` closes it. Right-click pins or unpins straight away. A small dot on the button shows while the board is pinned. If the button doesn't show up, add **Oma Year Planner** to the bar from the bar settings.
 
 You need Chromium (it ships with Omarchy), Python 3 for the theme sync and the pin helper, `curl`, and ImageMagick (`magick`) for wallpaper mode.
 
@@ -125,6 +128,10 @@ To remove a clone, delete the `oma-year-planner` folder, and remove any launcher
 
 Nothing is installed system-wide, and no Omarchy config files are changed. Wallpaper mode, only when you use it, sets the wallpaper and adds the user timer above. The removal steps above undo it.
 
+## Credits
+
+Inspired by Ivan's ([@ivandotcodes](https://x.com/ivandotcodes)) all-year calendar for Omarchy: https://x.com/ivandotcodes/status/2112172768255172671. He didn't share a download, so I built my own and open-sourced it. Thanks for the idea, Ivan.
+
 ## Tests
 
 ```sh
@@ -140,12 +147,14 @@ oma-year-planner/
 ├── preview.png       # screenshot
 ├── screenshots/      # README gallery
 ├── manifest.json     # Omarchy plugin manifest
-├── BarWidget.qml     # left-click opens, right-click pins the wallpaper
+├── BarWidget.qml     # bar button: left-click menu, right-click pins
+├── YearMenu.qml      # the bar menu
 └── year-planner/     # the app: index.html, CSS, plain JS, no dependencies
     ├── branding/     # icon.svg, icon-512.png, lockup.svg, lockup.png
     ├── open          # theme sync + app window launcher
     ├── wallpaper     # pin the board on the desktop
     ├── bridge        # 127.0.0.1-only helper for the Pin to desktop button
+    ├── app           # status, full screen and quit for the bar menu
     └── serve         # local server for the offline app
 ```
 
