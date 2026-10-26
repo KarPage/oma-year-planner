@@ -57,6 +57,89 @@ var Planner = (function () {
     return Math.round((b - a) / 86400000);
   }
 
+  function inclusiveDays(from, to) {
+    if (!parse(from) || !parse(to)) return 0;
+    var start = from <= to ? from : to;
+    var end = from <= to ? to : from;
+    return diffDays(start, end) + 1;
+  }
+
+  function prettyDate(iso) {
+    var p = parse(iso);
+    if (!p) return String(iso || "");
+    return MONTHS[p.m - 1] + " " + p.d;
+  }
+
+  function rangeCountLabel(from, to) {
+    if (!parse(from) || !parse(to)) return "";
+    var start = from <= to ? from : to;
+    var end = from <= to ? to : from;
+    var days = inclusiveDays(start, end);
+    var when = start === end ? prettyDate(start) : prettyDate(start) + " – " + prettyDate(end);
+    return when + " · " + days + (days === 1 ? " day" : " days");
+  }
+
+  function rollingRange(today, plans) {
+    var y = today && typeof today === "object" ? today.y : (parse(today) || {}).y;
+    if (!y) y = new Date().getFullYear();
+    var start = y;
+    var end = y + 1;
+    (plans || []).forEach(function (plan) {
+      if (!plan) return;
+      var a = parse(plan.start);
+      var b = parse(plan.end || plan.start);
+      if (a && a.y < start) start = a.y;
+      if (a && a.y > end) end = a.y;
+      if (b && b.y < start) start = b.y;
+      if (b && b.y > end) end = b.y;
+    });
+    return { start: start, end: end };
+  }
+
+  function copyPlan(plan, id) {
+    return {
+      id: id || "",
+      title: plan.title,
+      tag: plan.tag,
+      color: plan.color,
+      note: plan.note || "",
+      images: plan.images ? plan.images.slice() : [],
+      start: plan.start,
+      end: plan.end
+    };
+  }
+
+  function mergePlans(current, incoming, nextId) {
+    var byId = Object.create(null);
+    var order = [];
+    function put(plan) {
+      byId[plan.id] = plan;
+      order.push(plan.id);
+    }
+    (current || []).forEach(function (plan) {
+      if (!plan || !plan.id || byId[plan.id]) return;
+      put(copyPlan(plan, plan.id));
+    });
+    (incoming || []).forEach(function (plan, index) {
+      if (!plan) return;
+      var copy = copyPlan(plan, plan.id);
+      if (!copy.id || byId[copy.id]) {
+        var id = nextId ? nextId(copy, index) : "";
+        if (!id || byId[id]) id = "import-" + order.length;
+        while (byId[id]) id += "x";
+        copy.id = id;
+      }
+      put(copy);
+    });
+    return order.map(function (id) { return byId[id]; });
+  }
+
+  function isSingleDay(plan) {
+    if (!plan || !plan.start) return false;
+    var end = plan.end < plan.start ? plan.start : plan.end;
+    return plan.start === end;
+  }
+
   function daysInMonth(y, m) {
     return new Date(Date.UTC(y, m, 0)).getUTCDate();
   }
@@ -182,13 +265,16 @@ var Planner = (function () {
 
   function layoutMonths(plans, months) {
     var bars = [];
+    var singles = [];
     var lanes = Object.create(null);
     months.forEach(function (month) {
       var key = month.y + "-" + pad(month.m);
       var segs = [];
       plans.forEach(function (plan) {
         var seg = segmentInMonth(plan, month.y, month.m);
-        if (seg) segs.push(seg);
+        if (!seg) return;
+        if (isSingleDay(plan)) singles.push(seg);
+        else segs.push(seg);
       });
       segs.sort(function (a, b) {
         return a.startDay - b.startDay || a.endDay - b.endDay;
@@ -213,7 +299,7 @@ var Planner = (function () {
       });
       lanes[key] = laneEnds.length || 1;
     });
-    return { bars: bars, lanes: lanes };
+    return { bars: bars, lanes: lanes, singles: singles };
   }
 
   function segmentsFor(plan, year) {
@@ -402,6 +488,50 @@ var Planner = (function () {
     if (!noted || noted.note !== "pack https://example.com" || noted.images.length !== 1) {
       errors.push("note");
     }
+    if (inclusiveDays("2026-02-21", "2026-03-06") !== 14) errors.push("inclusive span");
+    if (inclusiveDays("2026-03-06", "2026-02-21") !== 14) errors.push("inclusive swap");
+    if (inclusiveDays("2026-06-01", "2026-06-01") !== 1) errors.push("inclusive one");
+    if (inclusiveDays("2024-02-28", "2024-03-01") !== 3) errors.push("inclusive leap");
+    if (rangeCountLabel("2026-02-21", "2026-03-06") !== "Feb 21 – Mar 6 · 14 days") {
+      errors.push("range label " + rangeCountLabel("2026-02-21", "2026-03-06"));
+    }
+    if (rangeCountLabel("2026-06-01", "2026-06-01") !== "Jun 1 · 1 day") {
+      errors.push("range label one " + rangeCountLabel("2026-06-01", "2026-06-01"));
+    }
+    var rollingEmpty = rollingRange({ y: 2026, m: 10, d: 25 }, []);
+    if (rollingEmpty.start !== 2026 || rollingEmpty.end !== 2027) errors.push("rolling empty");
+    var rollingInside = rollingRange({ y: 2026, m: 6, d: 1 }, [
+      { start: "2026-01-05", end: "2026-01-11" }
+    ]);
+    if (rollingInside.start !== 2026 || rollingInside.end !== 2027) errors.push("rolling inside");
+    var rollingWide = rollingRange({ y: 2026, m: 1, d: 1 }, [
+      { start: "2025-12-30", end: "2026-01-02" },
+      { start: "2028-05-01", end: "2028-05-04" },
+      { start: "nope", end: "nope" }
+    ]);
+    if (rollingWide.start !== 2025 || rollingWide.end !== 2028) errors.push("rolling wide");
+    var kept = [{ id: "a", title: "Keep", start: "2026-01-01", end: "2026-01-02", images: [{ name: "m", src: "data:image/png;base64,aaa" }] }];
+    var imported = [{ id: "a", title: "Imported", start: "2026-02-01", end: "2026-02-02", images: [] }];
+    var seq = 0;
+    var merged = mergePlans(kept, imported, function () { seq += 1; return "new-" + seq; });
+    if (merged.length !== 2 || merged[0].id !== "a" || merged[0].title !== "Keep") errors.push("merge keep");
+    if (!merged[0].images || merged[0].images.length !== 1) errors.push("merge images");
+    if (merged[1].id !== "new-1" || merged[1].title !== "Imported") errors.push("merge copy");
+    if (kept[0].title !== "Keep" || imported[0].id !== "a") errors.push("merge mutate");
+    var dupIncoming = mergePlans([], [
+      { id: "a", title: "First", start: "2026-01-01", end: "2026-01-01" },
+      { id: "a", title: "Second", start: "2026-01-02", end: "2026-01-02" }
+    ], function () { seq += 1; return "id-" + seq; });
+    if (dupIncoming.length !== 2 || dupIncoming[0].id === dupIncoming[1].id) errors.push("merge dup incoming");
+    if (dupIncoming[0].title !== "First" || dupIncoming[1].title !== "Second") errors.push("merge both incoming");
+    var mixed = layout([
+      { id: "span", title: "Span", start: "2026-05-01", end: "2026-05-10" },
+      { id: "one", title: "One", start: "2026-05-04", end: "2026-05-04" },
+      { id: "two", title: "Two", start: "2026-05-04", end: "2026-05-04" }
+    ], "2026-05-01", "2026-05-31");
+    if (mixed.lanes["2026-05"] !== 1) errors.push("single lane " + mixed.lanes["2026-05"]);
+    if (mixed.bars.length !== 1 || mixed.bars[0].planId !== "span") errors.push("single excluded from bars");
+    if (!mixed.singles || mixed.singles.length !== 2) errors.push("singles missing");
     return errors;
   }
 
@@ -415,6 +545,12 @@ var Planner = (function () {
     isoFromUTC: isoFromUTC,
     addDays: addDays,
     diffDays: diffDays,
+    inclusiveDays: inclusiveDays,
+    prettyDate: prettyDate,
+    rangeCountLabel: rangeCountLabel,
+    rollingRange: rollingRange,
+    mergePlans: mergePlans,
+    isSingleDay: isSingleDay,
     daysInMonth: daysInMonth,
     weekday: weekday,
     weekdayLetter: weekdayLetter,

@@ -1,9 +1,10 @@
 /* Year planner UI. Plans live in localStorage under year-planner/v1.
-   The visible span is one continuous scroll. Change the years here. */
+   The board shows this year through next year, and grows when a plan
+   falls outside that span. */
 (function () {
   var STORAGE_KEY = "year-planner/v1";
-  var RANGE_START = 2026;
-  var RANGE_END = 2027;
+  var RANGE_START = 0;
+  var RANGE_END = 0;
 
   var yearLabel = document.getElementById("year-label");
   var statsEl = document.getElementById("stats");
@@ -29,6 +30,9 @@
   var endInput = document.getElementById("f-end");
   var deleteBtn = document.getElementById("f-delete");
   var formError = document.getElementById("f-error");
+  var rangeFloater = document.getElementById("range-floater");
+  var tipEl = document.getElementById("tip");
+  var dayList = document.getElementById("day-list");
 
   var year = (function () {
     var stored = +sessionStorage.getItem("year-planner/year");
@@ -45,6 +49,9 @@
   var focusDate = null;
   var gesture = null;
   var createDrag = null;
+  var boardDrag = null;
+  var flingId = 0;
+  var pointerXY = null;
   var suppressClick = false;
   var draftImages = [];
   var undoStack = [];
@@ -535,6 +542,7 @@
           var letter = document.createElement("span");
           letter.className = "wd";
           letter.textContent = Planner.weekdayLetter(month.y, month.m, d);
+          letter.dataset.short = letter.textContent.slice(0, 1);
           if (Planner.weekday(month.y, month.m, d) === 0) {
             cell.classList.add("weekend");
             letter.classList.add("sun");
@@ -564,13 +572,31 @@
     board.replaceChildren(calendar);
   }
 
+  function singleStackHeight(count) {
+    if (!count) return 0;
+    var lines = Math.min(count, 3);
+    return 2 + (lines - 1) * 5 + 4 + 3;
+  }
+
   function syncBars() {
     var list = visible();
     var laid = Planner.layout(list, RANGE_START + "-01-01", RANGE_END + "-12-31");
-    board.querySelectorAll(".bar").forEach(function (bar) { bar.remove(); });
-    var tooled = {};
+    board.querySelectorAll(".bar, .single-more").forEach(function (bar) { bar.remove(); });
     var calendar = board.querySelector(".calendar");
     if (!calendar) return;
+    var groups = Object.create(null);
+    (laid.singles || []).forEach(function (seg) {
+      var iso = cellDate(seg.y, seg.month, seg.startDay);
+      if (!groups[iso]) groups[iso] = [];
+      groups[iso].push(seg);
+    });
+    var monthReserve = Object.create(null);
+    Object.keys(groups).forEach(function (iso) {
+      var ym = iso.slice(0, 7);
+      var height = singleStackHeight(groups[iso].length);
+      if (!monthReserve[ym] || height > monthReserve[ym]) monthReserve[ym] = height;
+    });
+    var tooled = {};
     laid.bars.forEach(function (bar) {
       var plan = bar.plan;
       var host = board.querySelector('.month[data-ym="' + bar.y + "-" + Planner.pad(bar.month) + '"]');
@@ -582,16 +608,17 @@
       if (bar.continuesAfter) el.classList.add("cont-after");
       if (plan.id === selectedId) el.classList.add("selected");
       el.style.setProperty("--cat", plan.color || "#74a869");
+      var ym = bar.y + "-" + Planner.pad(bar.month);
+      el.style.setProperty("--singles", (monthReserve[ym] || 0) + "px");
       el.style.gridColumn = (bar.startDay + 1) + " / " + (bar.endDay + 2);
       el.style.gridRow = host.dataset.row;
       el.style.setProperty("--lane", String(bar.lane));
-      el.style.setProperty("--lanes", String(laid.lanes[bar.y + "-" + Planner.pad(bar.month)] || 1));
+      el.style.setProperty("--lanes", String(laid.lanes[ym] || 1));
       el.dataset.id = plan.id;
       el.title = plan.title + " · " + bar.days + "d";
 
       var fill = document.createElement("span");
       fill.className = "fill";
-      if (bar.endDay === bar.startDay && !bar.continuesBefore && !bar.continuesAfter) fill.classList.add("single");
       if (bar.continuesBefore) {
         var before = document.createElement("span");
         before.className = "edge";
@@ -603,7 +630,13 @@
       text.textContent = plan.title;
       var count = document.createElement("span");
       count.className = "count";
-      count.textContent = " · " + bar.days + "d";
+      var countFull = document.createElement("span");
+      countFull.className = "count-full";
+      countFull.textContent = " · " + bar.days + "d";
+      var countShort = document.createElement("span");
+      countShort.className = "count-short";
+      countShort.textContent = "·" + bar.days + "d";
+      count.append(countFull, countShort);
       fill.append(text, count);
       if (bar.continuesAfter) {
         var after = document.createElement("span");
@@ -623,6 +656,41 @@
       }
       el.append(fill);
       calendar.append(el);
+    });
+    Object.keys(groups).forEach(function (iso) {
+      var segs = groups[iso];
+      var host = board.querySelector('.month[data-ym="' + iso.slice(0, 7) + '"]');
+      if (!host || !segs.length) return;
+      var shown = Math.min(segs.length, 3);
+      for (var i = 0; i < shown; i++) {
+        var plan = segs[i].plan;
+        var tick = document.createElement("button");
+        tick.type = "button";
+        tick.className = "bar single";
+        if (plan.id === selectedId) tick.classList.add("selected");
+        tick.style.setProperty("--cat", plan.color || "#74a869");
+        tick.style.setProperty("--slot", String(i));
+        tick.style.gridColumn = String(segs[i].startDay + 1);
+        tick.style.gridRow = host.dataset.row;
+        tick.dataset.id = plan.id;
+        tick.dataset.date = iso;
+        tick.setAttribute("aria-label", plan.title);
+        var mark = document.createElement("span");
+        mark.className = "fill single";
+        tick.append(mark);
+        calendar.append(tick);
+      }
+      if (segs.length > 3) {
+        var more = document.createElement("button");
+        more.type = "button";
+        more.className = "single-more";
+        more.dataset.date = iso;
+        more.style.gridColumn = String(segs[0].startDay + 1);
+        more.style.gridRow = host.dataset.row;
+        more.textContent = "+" + (segs.length - 3);
+        more.setAttribute("aria-label", (segs.length - 3) + " more plans");
+        calendar.append(more);
+      }
     });
   }
 
@@ -654,17 +722,153 @@
     if (cell) cell.classList.add("focus");
   }
 
+  function headHeight() {
+    var raw = getComputedStyle(board).getPropertyValue("--head");
+    var n = parseFloat(raw);
+    return n > 0 ? n : 26;
+  }
+
+  var scrollGen = 0;
+
   function scrollToMonth(y, m, smooth) {
     var label = board.querySelector('.month[data-ym="' + y + "-" + Planner.pad(m) + '"]');
     if (!label) return;
-    var top = label.getBoundingClientRect().top - board.getBoundingClientRect().top + board.scrollTop - 26;
-    var motion = smooth && !window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "smooth" : "auto";
-    board.scrollTo({ top: Math.max(0, top), behavior: motion });
+    var top = Math.max(0, label.getBoundingClientRect().top - board.getBoundingClientRect().top + board.scrollTop - headHeight());
+    var reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    var gen = ++scrollGen;
+    if (!(smooth && !reduce) || Math.abs(board.scrollTop - top) < 2) {
+      board.scrollTo({ top: top, behavior: "auto" });
+      if (!boardDrag) board.classList.remove("panning");
+      return;
+    }
+    /* Snap is off while the board glides, otherwise a mandatory snap
+       stops a Page Down or Home on the next month. */
+    board.classList.add("panning");
+    board.scrollTo({ top: top, behavior: "smooth" });
+    function done() {
+      board.removeEventListener("scrollend", done);
+      if (gen !== scrollGen || boardDrag) return;
+      board.classList.remove("panning");
+    }
+    board.addEventListener("scrollend", done);
+    setTimeout(done, 900);
+  }
+
+  function monthAtTopIndex() {
+    var months = board.querySelectorAll(".month");
+    var edge = board.getBoundingClientRect().top + headHeight() + 2;
+    for (var i = 0; i < months.length; i++) {
+      if (months[i].getBoundingClientRect().bottom > edge) return i;
+    }
+    return Math.max(0, months.length - 1);
+  }
+
+  function scrollByMonths(delta) {
+    var months = board.querySelectorAll(".month");
+    if (!months.length) return;
+    var index = monthAtTopIndex() + delta;
+    if (index < 0) index = 0;
+    if (index > months.length - 1) index = months.length - 1;
+    var parts = months[index].dataset.ym.split("-");
+    scrollToMonth(+parts[0], +parts[1], true);
+  }
+
+  var snapTimer = 0;
+
+  function nearestMonth() {
+    var months = board.querySelectorAll(".month");
+    var edge = board.getBoundingClientRect().top + headHeight();
+    var best = null;
+    var bestDist = Infinity;
+    for (var i = 0; i < months.length; i++) {
+      var dist = months[i].getBoundingClientRect().top - edge;
+      if (Math.abs(dist) < Math.abs(bestDist)) {
+        bestDist = dist;
+        best = months[i];
+      }
+    }
+    return best;
+  }
+
+  function finishSnap() {
+    var target = nearestMonth();
+    if (!target) {
+      if (!boardDrag) board.classList.remove("panning");
+      return;
+    }
+    var parts = target.dataset.ym.split("-");
+    scrollToMonth(+parts[0], +parts[1], true);
+  }
+
+  function flingBoard(velocity) {
+    var reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (reduce || Math.abs(velocity) < 0.05) {
+      finishSnap();
+      return;
+    }
+    var v = Math.max(-2.4, Math.min(2.4, velocity));
+    var last = performance.now();
+    function frame(now) {
+      if (boardDrag) return;
+      var dt = Math.min(34, now - last);
+      last = now;
+      board.scrollTop += v * dt;
+      v *= Math.pow(0.93, dt / 16);
+      if (Math.abs(v) > 0.04) flingId = requestAnimationFrame(frame);
+      else finishSnap();
+    }
+    flingId = requestAnimationFrame(frame);
+  }
+
+  function startBoardDrag(event) {
+    if (flingId) cancelAnimationFrame(flingId);
+    flingId = 0;
+    if (snapTimer) clearTimeout(snapTimer);
+    boardDrag = {
+      pointerId: event.pointerId,
+      y: event.clientY,
+      lastY: event.clientY,
+      lastT: performance.now(),
+      originScroll: board.scrollTop,
+      velocity: 0,
+      moved: false
+    };
+    board.classList.add("panning");
+    try { board.setPointerCapture(event.pointerId); } catch (err) { /* pointer already gone */ }
+    event.preventDefault();
+  }
+
+  function moveBoardDrag(event) {
+    var drag = boardDrag;
+    if (!drag) return;
+    var now = performance.now();
+    var dy = event.clientY - drag.y;
+    if (Math.abs(dy) > 3) drag.moved = true;
+    board.scrollTop = drag.originScroll - dy;
+    var dt = Math.max(1, now - drag.lastT);
+    var instant = (drag.lastY - event.clientY) / dt;
+    drag.velocity = drag.velocity * 0.65 + instant * 0.35;
+    drag.lastY = event.clientY;
+    drag.lastT = now;
+  }
+
+  function endBoardDrag() {
+    var drag = boardDrag;
+    boardDrag = null;
+    if (!drag) return;
+    try {
+      if (board.hasPointerCapture(drag.pointerId)) board.releasePointerCapture(drag.pointerId);
+    } catch (err) { /* already released */ }
+    if (!drag.moved) {
+      board.classList.remove("panning");
+      return;
+    }
+    flingBoard(drag.velocity);
   }
 
   function updateViewYear() {
     var months = board.querySelectorAll(".month");
-    var edge = board.getBoundingClientRect().top + 30;
+    var edge = board.getBoundingClientRect().top + headHeight() + 4;
     var found = RANGE_START;
     for (var i = 0; i < months.length; i++) {
       if (months[i].getBoundingClientRect().bottom > edge) {
@@ -788,8 +992,127 @@
     });
   }
 
+  function hideFloater() {
+    if (rangeFloater) rangeFloater.hidden = true;
+  }
+
+  function placeFixed(el, x, y, dx, dy) {
+    var left = x + dx;
+    var top = y + dy;
+    el.style.left = left + "px";
+    el.style.top = top + "px";
+    var rect = el.getBoundingClientRect();
+    if (rect.right > window.innerWidth - 8) left = Math.max(8, x - rect.width - 12);
+    if (rect.bottom > window.innerHeight - 8) top = Math.max(8, y - rect.height - 12);
+    if (left < 8) left = 8;
+    if (top < 8) top = 8;
+    el.style.left = left + "px";
+    el.style.top = top + "px";
+  }
+
+  function showFloater(text) {
+    if (!rangeFloater || !text) return;
+    rangeFloater.hidden = false;
+    rangeFloater.textContent = text;
+    var x = pointerXY ? pointerXY.x : 24;
+    var y = pointerXY ? pointerXY.y : 24;
+    placeFixed(rangeFloater, x, y, 14, 16);
+  }
+
+  function hideTip() {
+    if (tipEl) tipEl.hidden = true;
+  }
+
+  function showTip(iso, x, y) {
+    if (!tipEl) return;
+    var list = plansOn(iso).filter(Planner.isSingleDay);
+    if (!list.length) return;
+    tipEl.hidden = false;
+    tipEl.replaceChildren();
+    list.forEach(function (plan) {
+      var line = document.createElement("div");
+      line.textContent = plan.title;
+      tipEl.append(line);
+    });
+    placeFixed(tipEl, x, y, 12, 14);
+  }
+
+  function closeDayList() {
+    if (dayList) dayList.hidden = true;
+  }
+
+  function openDayList(iso, anchor) {
+    if (!dayList) return;
+    var list = plansOn(iso).filter(Planner.isSingleDay);
+    if (!list.length) return;
+    hideTip();
+    dayList.hidden = false;
+    dayList.replaceChildren();
+    list.forEach(function (plan) {
+      var row = document.createElement("div");
+      row.className = "day-list-row";
+      var pick = document.createElement("button");
+      pick.type = "button";
+      pick.className = "day-list-pick";
+      var swatch = document.createElement("span");
+      swatch.className = "dot";
+      swatch.style.background = plan.color || "var(--accent)";
+      var name = document.createElement("span");
+      name.className = "name";
+      name.textContent = plan.title;
+      pick.append(swatch, name);
+      pick.addEventListener("click", function () {
+        closeDayList();
+        selectedId = plan.id;
+        selection = { start: plan.start, end: plan.end };
+        focusDate = plan.start;
+        arm = null;
+        hoverDate = null;
+        noteDismissedFor = null;
+        render();
+        var chosen = planById(plan.id);
+        if (chosen) showNote(chosen, true);
+        syncTools();
+      });
+      var edit = document.createElement("button");
+      edit.type = "button";
+      edit.className = "ghost";
+      edit.textContent = "Edit";
+      edit.addEventListener("click", function () {
+        closeDayList();
+        selectedId = plan.id;
+        openEditor(plan);
+      });
+      row.append(pick, edit);
+      dayList.append(row);
+    });
+    var rect = anchor.getBoundingClientRect();
+    placeFixed(dayList, rect.left, rect.bottom, 0, 6);
+  }
+
+  function showAddBar(range) {
+    var text = Planner.rangeCountLabel(range.start, range.end);
+    actionEl.hidden = false;
+    actionLabel.textContent = text;
+    actionAdd.hidden = false;
+    actionAdd.textContent = "Add plan";
+    actionEdit.hidden = true;
+    actionOpen.hidden = true;
+    actionDelete.hidden = true;
+    noteShownFor = null;
+    noteCard.hidden = true;
+    noteCard.replaceChildren();
+    return text;
+  }
+
   function updateAction() {
+    var live = arm ? ordered(arm, hoverDate || arm) : null;
     var plan = selectedId ? planById(selectedId) : null;
+    if (live) {
+      showFloater(showAddBar(live));
+      return;
+    }
+    if (!(gesture && gesture.moved)) hideFloater();
     if (!plan && !selection) {
       actionEl.hidden = true;
       noteCard.hidden = true;
@@ -808,23 +1131,8 @@
       }
       syncTools();
     } else {
-      var days = Planner.diffDays(selection.start, selection.end) + 1;
-      var here = selection.start === selection.end ? plansOn(selection.start).length : 0;
-      var when = selection.start === selection.end
-        ? pretty(selection.start)
-        : pretty(selection.start) + " – " + pretty(selection.end) + " · " + days + " days";
-      if (here) when += " · " + here + (here === 1 ? " plan" : " plans");
-      actionLabel.textContent = when;
-      actionAdd.hidden = false;
-      actionAdd.textContent = here ? "Add another" : "Add plan";
-      actionEdit.hidden = true;
-      actionOpen.hidden = true;
-      actionDelete.hidden = true;
-      noteShownFor = null;
-      noteCard.hidden = true;
-      noteCard.replaceChildren();
+      showAddBar(selection);
     }
-    if (!actionEl.hidden) placePopover(actionEl, selection.start);
   }
 
   function rectsOverlap(a, b) {
@@ -983,6 +1291,23 @@
   }
 
   function render() {
+    var keepYm = null;
+    var span = Planner.rollingRange(todayParts(), plans);
+    if (span.start !== RANGE_START || span.end !== RANGE_END) {
+      var monthsNow = board.querySelectorAll(".month");
+      if (monthsNow.length) {
+        var edge = board.getBoundingClientRect().top + headHeight() + 2;
+        for (var i = 0; i < monthsNow.length; i++) {
+          if (monthsNow[i].getBoundingClientRect().bottom > edge) {
+            keepYm = monthsNow[i].dataset.ym;
+            break;
+          }
+        }
+      }
+      RANGE_START = span.start;
+      RANGE_END = span.end;
+      board.replaceChildren();
+    }
     if (selectedId && !planById(selectedId)) selectedId = null;
     renderChrome();
     if (!board.querySelector(".calendar")) buildGrid();
@@ -993,6 +1318,10 @@
     paintSelection();
     paintFocus();
     if (!noteCard.hidden && selectedId && planById(selectedId)) showNote(planById(selectedId), true);
+    if (keepYm) {
+      var kept = keepYm.split("-");
+      scrollToMonth(+kept[0], +kept[1], false);
+    }
   }
 
   function listenPointer() {}
@@ -1021,7 +1350,8 @@
   }
 
   function onArmMove(event) {
-    if (!arm || gesture || dialog.open) return;
+    pointerXY = { x: event.clientX, y: event.clientY };
+    if (!arm || gesture || dialog.open || boardDrag) return;
     var iso = dateFromPoint(event.clientX, event.clientY);
     if (!iso || iso === hoverDate) return;
     hoverDate = iso;
@@ -1029,6 +1359,12 @@
   }
 
   function onPointerMove(event) {
+    pointerXY = { x: event.clientX, y: event.clientY };
+    if (boardDrag) {
+      moveBoardDrag(event);
+      return;
+    }
+    if (rangeFloater && !rangeFloater.hidden) placeFixed(rangeFloater, event.clientX, event.clientY, 14, 16);
     if (createDrag && !gesture) {
       var over = dateFromPoint(event.clientX, event.clientY);
       if (over && over !== createDrag.iso && Math.hypot(event.clientX - createDrag.x, event.clientY - createDrag.y) > 6) {
@@ -1048,13 +1384,16 @@
     if (!plan) return;
     var preview = previewDates(gesture, iso);
     if (!preview) return;
+    gesture.preview = preview;
     paintDrop(preview.start, preview.end);
     board.querySelectorAll('.bar[data-id="' + CSS.escape(plan.id) + '"]').forEach(function (bar) {
       bar.classList.add("lifting");
     });
+    var counted = Planner.rangeCountLabel(preview.start, preview.end);
+    showFloater(counted);
     setStatus(gesture.mode === "move"
-      ? "Move " + plan.title + " to " + rangeText(preview)
-      : "Resize " + plan.title + " to " + rangeText(preview));
+      ? "Move " + plan.title + " to " + counted
+      : "Resize " + plan.title + " to " + counted);
   }
 
   function previewDates(g, iso) {
@@ -1067,11 +1406,11 @@
     };
   }
 
-  function rangeText(range) {
-    return range.start === range.end ? pretty(range.start) : pretty(range.start) + " – " + pretty(range.end);
-  }
-
   function onPointerUp(event) {
+    if (boardDrag) {
+      endBoardDrag();
+      return;
+    }
     if (createDrag && !gesture) {
       var drag = createDrag;
       createDrag = null;
@@ -1181,6 +1520,7 @@
   }
 
   function onCellClick(event) {
+    if (event && event.clientX != null) pointerXY = { x: event.clientX, y: event.clientY };
     if (suppressClick) {
       suppressClick = false;
       return;
@@ -1254,6 +1594,8 @@
   }
 
   function openEditor(plan, defaults, focusNote) {
+    closeDayList();
+    hideFloater();
     editingId = plan ? plan.id : null;
     formError.textContent = "";
     titleInput.value = plan ? plan.title : "";
@@ -1521,21 +1863,7 @@
   }
 
   function mergeById(current, incoming) {
-    var byId = Object.create(null);
-    var order = [];
-    current.forEach(function (plan) {
-      byId[plan.id] = plan;
-      order.push(plan.id);
-    });
-    incoming.forEach(function (plan) {
-      var existing = byId[plan.id];
-      if (!existing) order.push(plan.id);
-      else if ((!plan.images || !plan.images.length) && existing.images && existing.images.length) {
-        plan.images = existing.images.slice();
-      }
-      byId[plan.id] = plan;
-    });
-    return order.map(function (id) { return byId[id]; });
+    return Planner.mergePlans(current, incoming, function () { return newId(0); });
   }
 
   function askImport(count, noun) {
@@ -1628,8 +1956,13 @@
       gesture = null;
       silencePointer();
       clearDrop();
+      hideFloater();
       setStatus("");
       render();
+      return;
+    }
+    if (event.key === "Escape" && dayList && !dayList.hidden) {
+      closeDayList();
       return;
     }
     var help = document.getElementById("help");
@@ -1662,6 +1995,15 @@
     } else if (event.key === "n" || event.key === "N" || event.key === "a") {
       var iso = focusDate || (selection && selection.start) || todayIso();
       openEditor(null, { start: iso, end: (selection && selection.end) || iso });
+    } else if (event.key === "PageUp" || event.key === "PageDown") {
+      event.preventDefault();
+      scrollByMonths(event.key === "PageUp" ? -6 : 6);
+    } else if (event.key === "Home") {
+      event.preventDefault();
+      scrollToMonth(RANGE_START, 1, true);
+    } else if (event.key === "End") {
+      event.preventDefault();
+      scrollToMonth(RANGE_END, 12, true);
     } else if (event.key === "Enter") {
       var chosen = selectedId ? planById(selectedId) : null;
       if (!chosen && focusDate) {
@@ -1672,6 +2014,11 @@
       else if (focusDate) openEditor(null, { start: focusDate, end: focusDate });
       else if (selection) addFromSelection(false);
     } else if (event.key === "ArrowLeft" || event.key === "ArrowRight" || event.key === "ArrowUp" || event.key === "ArrowDown") {
+      if ((event.key === "ArrowUp" || event.key === "ArrowDown") && (event.shiftKey || !focusDate)) {
+        event.preventDefault();
+        scrollByMonths(event.key === "ArrowUp" ? -1 : 1);
+        return;
+      }
       event.preventDefault();
       var dayDelta = event.key === "ArrowLeft" ? -1 : event.key === "ArrowRight" ? 1 : 0;
       var monthDelta = event.key === "ArrowUp" ? -1 : event.key === "ArrowDown" ? 1 : 0;
@@ -1694,7 +2041,7 @@
       var cell = board.querySelector('.cell[data-date="' + focusDate + '"]');
       if (cell) {
         var top = cell.getBoundingClientRect().top - board.getBoundingClientRect().top;
-        if (top < 26 || top > board.clientHeight - 40) scrollToMonth(next.y, next.m, true);
+        if (top < headHeight() || top > board.clientHeight - 40) scrollToMonth(next.y, next.m, true);
       }
     } else if ((event.key === "Delete" || event.key === "Backspace") && selectedId) {
       event.preventDefault();
@@ -1706,9 +2053,16 @@
   });
 
   function onPointerCancel() {
+    if (boardDrag) {
+      boardDrag = null;
+      board.classList.remove("panning");
+      if (flingId) cancelAnimationFrame(flingId);
+      flingId = 0;
+    }
     var dragging = !!(gesture || (createDrag && createDrag.moved));
     createDrag = null;
     gesture = null;
+    hideFloater();
     clearDrop();
     if (!dragging) return;
     arm = null;
@@ -1721,7 +2075,15 @@
   window.addEventListener("pointerup", onPointerUp);
   window.addEventListener("pointercancel", onPointerCancel);
 
-  board.addEventListener("click", onCellClick);
+  board.addEventListener("click", function (event) {
+    var mark = event.target.closest && event.target.closest(".bar.single, .single-more");
+    if (mark) {
+      event.preventDefault();
+      openDayList(mark.dataset.date, mark);
+      return;
+    }
+    onCellClick(event);
+  });
   board.addEventListener("dblclick", function (event) {
     var bar = event.target.closest && event.target.closest(".bar");
     if (!bar) return;
@@ -1735,7 +2097,14 @@
   });
   board.addEventListener("pointerdown", function (event) {
     if (event.button !== 0) return;
-    if (event.target.closest && event.target.closest("[data-act], .plan-tools")) return;
+    pointerXY = { x: event.clientX, y: event.clientY };
+    if (event.target.closest && event.target.closest("[data-act], .plan-tools, #day-list")) return;
+    if (event.target.closest && event.target.closest(".bar.single, .single-more")) return;
+    var scroller = event.target.closest && event.target.closest(".month, .year-divider");
+    if (scroller) {
+      startBoardDrag(event);
+      return;
+    }
     var fill = event.target.closest && event.target.closest(".fill");
     if (fill) {
       onBarDown(event);
@@ -1745,7 +2114,27 @@
     if (!cell) return;
     createDrag = { iso: cell.dataset.date, x: event.clientX, y: event.clientY, moved: false };
   });
+  board.addEventListener("pointerover", function (event) {
+    var mark = event.target.closest && event.target.closest(".bar.single, .single-more");
+    if (!mark) return;
+    showTip(mark.dataset.date, event.clientX, event.clientY);
+  });
+  board.addEventListener("pointerout", function (event) {
+    var mark = event.target.closest && event.target.closest(".bar.single, .single-more");
+    if (!mark) return;
+    var next = event.relatedTarget && event.relatedTarget.closest && event.relatedTarget.closest(".bar.single, .single-more");
+    if (next && next.dataset.date === mark.dataset.date) return;
+    hideTip();
+  });
+  board.addEventListener("wheel", function () {
+    if (flingId) cancelAnimationFrame(flingId);
+    flingId = 0;
+    scrollGen += 1;
+    if (!boardDrag) board.classList.remove("panning");
+  }, { passive: true });
   board.addEventListener("scroll", function () {
+    closeDayList();
+    hideTip();
     if (board.dataset.ticking) return;
     board.dataset.ticking = "1";
     requestAnimationFrame(function () {
@@ -1755,9 +2144,13 @@
   });
 
   document.addEventListener("pointerdown", function (event) {
+    pointerXY = { x: event.clientX, y: event.clientY };
+    if (dayList && !dayList.hidden && !dayList.contains(event.target) && !(event.target.closest && event.target.closest(".bar.single, .single-more"))) {
+      closeDayList();
+    }
     if (actionEl.hidden) return;
     if (actionEl.contains(event.target)) return;
-    if (event.target.closest && event.target.closest(".cell[data-date], .bar, #add, #today, #today-title")) return;
+    if (event.target.closest && event.target.closest(".cell[data-date], .bar, .month, .year-divider, .single-more, #add, #today, #today-title, #day-list")) return;
     selection = null;
     arm = null;
     hoverDate = null;
@@ -1901,7 +2294,16 @@
 
   if (location.protocol === "http:" || location.protocol === "https:") {
     if ("serviceWorker" in navigator) {
+      var hadController = !!navigator.serviceWorker.controller;
+      var reloading = false;
       navigator.serviceWorker.register("sw.js").catch(function () {});
+      if (hadController) {
+        navigator.serviceWorker.addEventListener("controllerchange", function () {
+          if (reloading) return;
+          reloading = true;
+          location.reload();
+        });
+      }
     }
   }
 

@@ -4,15 +4,13 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Year planner</title>
-  <meta name="theme-color" content="#000d04">
+  <meta name="theme-color" content="">
   <link rel="icon" href="icon.svg" type="image/svg+xml">
   <link rel="manifest" href="manifest.json">
   <style>
     :root {
       --sun: var(--personal, #c0d1a4);
-      --range: #e6d48a;
       --danger: color-mix(in srgb, var(--fg) 62%, var(--bg));
-      --handle: #f4efe2;
       --line: color-mix(in srgb, var(--fg) 12%, transparent);
       --line-strong: color-mix(in srgb, var(--fg) 28%, transparent);
       --font: "iA Writer Quattro S", "iA Writer Duo S", sans-serif;
@@ -264,21 +262,29 @@
     }
 
     .board {
+      --head: 26px;
       flex: 1;
       min-width: 0;
       min-height: 0;
-      overflow-x: auto;
+      overflow-x: hidden;
       overflow-y: auto;
       container-type: size;
-      scroll-padding-top: 26px;
+      scroll-padding-top: var(--head);
+      scroll-snap-type: y mandatory;
+      scroll-behavior: smooth;
       border-top: 1px solid var(--line-strong);
       border-bottom: 1px solid var(--line-strong);
       background: color-mix(in srgb, var(--bg-raised) 35%, var(--bg));
     }
+    .board.panning {
+      scroll-snap-type: none;
+      scroll-behavior: auto;
+      cursor: grabbing;
+    }
 
     .calendar {
-      --head: 26px;
-      --month-h: calc((100dvh - 11rem) / 12);
+      --month-h: calc((100dvh - 16rem) / 12);
+      --month-h: max(0px, calc((100cqh - var(--head) - 22px) / 12));
       display: grid;
       grid-template-columns: 4.4rem repeat(31, minmax(0, 1fr)) 2.6rem;
       grid-auto-rows: auto;
@@ -340,6 +346,8 @@
     .cell, .month, .month-total { min-width: 0; height: var(--month-h); }
     .cell { position: relative; overflow: hidden; }
     .cell[data-date] { cursor: pointer; touch-action: none; }
+    .month, .year-divider { cursor: grab; touch-action: none; }
+    .month { scroll-snap-align: start; }
     .year-divider {
       grid-column: 1 / -1;
       height: 22px;
@@ -433,8 +441,8 @@
       position: absolute;
       left: 1px;
       right: 1px;
-      top: calc(14px + (100% - 16px) * (var(--lane) + 0.1) / var(--lanes));
-      height: calc((100% - 16px) / var(--lanes) * 0.8);
+      top: calc(14px + (100% - 16px - var(--singles, 0px)) * (var(--lane) + 0.1) / var(--lanes));
+      height: max(0px, calc((100% - 16px - var(--singles, 0px)) / var(--lanes) * 0.8));
       min-height: 0;
       display: flex;
       align-items: center;
@@ -455,9 +463,7 @@
     }
     .fill .count { flex: none; opacity: 0.85; }
     .fill .edge { flex: none; font-weight: 700; }
-    @container (max-width: 8.5rem) {
-      .fill .count { display: none; }
-    }
+    .count-short { display: none; }
     .bar.cont-before .fill {
       mask-image: linear-gradient(to right, transparent, #000 14px);
     }
@@ -520,20 +526,28 @@
     .plan-tools button.danger:hover { border-color: var(--danger); color: var(--danger); }
 
     .action {
-      position: fixed;
+      position: absolute;
+      left: 50%;
+      bottom: 8px;
+      transform: translateX(-50%);
       z-index: 30;
       display: flex;
       align-items: center;
       gap: 12px;
-      max-width: calc(100% - 24px);
+      max-width: calc(100% - 16px);
       padding: 8px 8px 8px 14px;
       border: 1px solid var(--line-strong);
       background: color-mix(in srgb, var(--bg-raised) 88%, var(--bg));
       box-shadow: 0 10px 30px color-mix(in srgb, var(--bg-deep) 65%, transparent);
     }
     .action[hidden] { display: none; }
-    .action p { margin: 0; font-size: 13px; white-space: nowrap; }
-    .action-buttons { display: flex; gap: 6px; }
+    .action p {
+      margin: 0;
+      min-width: 0;
+      font-size: 13px;
+      line-height: 1.3;
+    }
+    .action-buttons { display: flex; gap: 6px; flex: none; }
     .action .primary, .action .ghost, .action .icon-btn { height: 32px; justify-self: auto; }
     .action .icon-btn {
       width: 32px;
@@ -541,6 +555,8 @@
       place-items: center;
       padding: 0;
     }
+    .action .primary[hidden],
+    .action .icon-btn[hidden] { display: none; }
     .action .icon-btn svg { display: block; }
     .foot {
       display: flex;
@@ -712,8 +728,198 @@
     .form-actions { display: flex; justify-content: flex-end; gap: 8px; }
     #f-delete { margin-right: auto; }
     #f-error { min-height: 1em; margin: 0; color: var(--personal); font-size: 12px; }
+
+    .bar.single {
+      align-self: end;
+      z-index: 5;
+      height: 4px;
+      min-height: 4px;
+      margin: 0 2px calc(2px + (var(--slot, 0) * 5px));
+      overflow: visible;
+      pointer-events: none;
+    }
+    .bar.single .fill {
+      position: absolute;
+      inset: 0;
+      top: 0;
+      height: 4px;
+      min-height: 4px;
+      padding: 0;
+      border: 0;
+      border-radius: 99px;
+      background: var(--cat, var(--accent));
+      cursor: pointer;
+      pointer-events: auto;
+    }
+    .bar.single.selected .fill,
+    .bar.single:hover .fill {
+      box-shadow: 0 0 0 1px var(--fg);
+      border-width: 0;
+      filter: none;
+    }
+    .single-more {
+      align-self: end;
+      justify-self: end;
+      z-index: 7;
+      width: auto;
+      height: 11px;
+      margin: 0 1px 2px;
+      padding: 0 2px;
+      border: 0;
+      background: color-mix(in srgb, var(--bg) 72%, var(--fg));
+      color: var(--bg);
+      font-family: var(--mono);
+      font-size: 8px;
+      font-weight: 700;
+      line-height: 11px;
+      cursor: pointer;
+    }
+    .range-floater, .tip {
+      position: fixed;
+      z-index: 40;
+      pointer-events: none;
+      max-width: min(280px, calc(100vw - 16px));
+      padding: 4px 8px;
+      border: 1px solid var(--line-strong);
+      background: var(--bg-raised);
+      color: var(--fg);
+      font-size: 12px;
+      line-height: 1.35;
+      box-shadow: 0 8px 20px color-mix(in srgb, var(--bg-deep) 55%, transparent);
+    }
+    .range-floater { white-space: nowrap; }
+    .range-floater[hidden], .tip[hidden], .day-list[hidden] { display: none; }
+    .day-list {
+      position: fixed;
+      z-index: 41;
+      min-width: 180px;
+      max-width: min(280px, calc(100vw - 16px));
+      padding: 4px;
+      border: 1px solid var(--line-strong);
+      background: var(--bg);
+      box-shadow: 0 12px 32px color-mix(in srgb, var(--bg-deep) 70%, transparent);
+    }
+    .day-list-row { display: flex; align-items: center; gap: 4px; }
+    .day-list-pick {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+      height: 32px;
+      padding: 0 8px;
+      border: 0;
+      background: transparent;
+      text-align: left;
+    }
+    .day-list-pick:hover, .day-list-row .ghost:hover { background: color-mix(in srgb, var(--fg) 8%, transparent); }
+    .day-list-pick .name {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .day-list-row .ghost { height: 28px; padding: 0 8px; }
+
+    @media (min-width: 1001px) {
+      .calendar { grid-template-columns: 5.4rem repeat(31, minmax(0, 1fr)) 3.1rem; }
+      .month .name { font-size: 17px; }
+      .bar:not(.single) .fill {
+        padding: 0 clamp(8px, 0.8vw, 18px);
+        font-size: clamp(12px, 50cqh, 15px);
+      }
+    }
+
+    @media (max-width: 1000px) {
+      body { gap: 4px; padding-top: 4px; }
+      .top {
+        grid-template-columns: minmax(0, 1fr) auto;
+        grid-template-areas: "brand add" "nav nav";
+        gap: 4px 8px;
+      }
+      .brand { grid-area: brand; gap: 8px; min-width: 0; }
+      .nav { grid-area: nav; justify-content: center; flex-wrap: wrap; gap: 4px; }
+      #add { grid-area: add; }
+      .mark { width: 20px; height: 20px; }
+      .eyebrow { display: none; }
+      .today-kicker { font-size: 9px; letter-spacing: 0.12em; }
+      .today-line {
+        font-size: clamp(16px, 3.2vw, 22px);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        max-width: 100%;
+      }
+      .year-num { font-size: 18px; min-width: 4.2ch; }
+      .icon-btn, .ghost { height: 30px; }
+      .icon-btn { width: 30px; }
+      .ghost, .primary { padding: 0 8px; }
+      .primary { height: 32px; }
+      .intro { padding: 6px 8px; }
+      .hud { gap: 4px 8px; }
+      .hud-side { gap: 6px; }
+      .rhythm { font-size: 13px; }
+      .stats {
+        flex-wrap: nowrap;
+        gap: 8px;
+        padding: 2px 8px;
+        border: 1px solid var(--line-strong);
+        background: color-mix(in srgb, var(--fg) 4%, transparent);
+      }
+      .stat-box {
+        flex-direction: row;
+        align-items: baseline;
+        gap: 4px;
+        min-width: 0;
+        min-height: 0;
+        padding: 0;
+        border: 0;
+        background: transparent;
+      }
+      .stat-box b { font-size: 13px; }
+      .stat-box span {
+        margin-top: 0;
+        max-width: none;
+        letter-spacing: 0.04em;
+      }
+      .search {
+        height: 32px;
+        min-width: 0;
+        flex: 1 1 8rem;
+        max-width: none;
+      }
+      .board { --head: 20px; }
+      .calendar { grid-template-columns: 2.4rem repeat(31, minmax(0, 1fr)) 1.25rem; }
+      .month { padding: 0 2px; }
+      .month .num { display: none; }
+      .month .name { font-size: 11px; letter-spacing: -0.03em; }
+      .daynum { font-size: 9px; }
+      .corner, .away-head { font-size: 0; }
+      .corner::after { content: "M"; font-size: 8px; }
+      .away-head::after { content: "A"; font-size: 8px; }
+      .month-total { font-size: 9px; }
+      .wd { font-size: 0; line-height: 0; }
+      .wd::after {
+        content: attr(data-short);
+        font-size: 9px;
+        line-height: 1;
+        font-weight: 650;
+      }
+      .bar:not(.single) .fill { padding: 0 3px; font-size: clamp(8px, 42cqh, 11px); }
+      .count-full { display: none; }
+      .count-short { display: inline; }
+      .foot { flex-wrap: wrap; gap: 6px; }
+      .backup { flex-wrap: wrap; gap: 8px; }
+      .backup button { font-size: 12px; }
+    }
   </style>
   <link rel="stylesheet" href="theme.css">
+  <script>
+    (function () {
+      var bg = getComputedStyle(document.documentElement).getPropertyValue("--bg").trim();
+      var meta = document.querySelector('meta[name="theme-color"]');
+      if (meta && bg) meta.setAttribute("content", bg);
+    })();
+  </script>
 </head>
 <body>
   <header class="top">
@@ -814,8 +1020,10 @@
         <li>Click a day to select it. Click it again, then click another day, to add that range. Click the same day a third time to add just that day.</li>
         <li>Drag across days to add a plan.</li>
         <li>Drag a bar to move it. Drag either end to resize it. Double-click a bar to edit its note.</li>
-        <li><kbd>T</kbd> jumps to today. <kbd>N</kbd> adds a plan. Arrow keys move the focused day. <kbd>Enter</kbd> edits. <kbd>Esc</kbd> closes. <kbd>?</kbd> opens this list. <kbd>/</kbd> searches. <kbd>Ctrl</kbd>+<kbd>Z</kbd> undoes.</li>
-        <li>Rolling 12 scrolls so the current month sits at the top. The year arrows scroll to January of that year.</li>
+        <li>A one-day plan is a thin line at the bottom of that day. Several stack, and a small +N stands in for the rest. Hover lists them. Click opens the list so you can pick or edit one.</li>
+        <li>Drag the month names, or a year divider, to scroll the board. The wheel snaps to a month.</li>
+        <li><kbd>T</kbd> jumps to today. <kbd>N</kbd> adds a plan. <kbd>←</kbd> <kbd>→</kbd> move the focused day. <kbd>↑</kbd> <kbd>↓</kbd> move it by a month, or scroll the board when no day is focused. <kbd>Shift</kbd>+<kbd>↑</kbd> <kbd>↓</kbd> scroll a month while a day is focused. <kbd>Page Up</kbd> <kbd>Page Down</kbd> move about six months. <kbd>Home</kbd> <kbd>End</kbd> jump to the ends. <kbd>Enter</kbd> edits. <kbd>Esc</kbd> closes. <kbd>?</kbd> opens this list. <kbd>/</kbd> searches. <kbd>Ctrl</kbd>+<kbd>Z</kbd> undoes.</li>
+        <li>The board shows this year and next, and grows if a plan falls outside that. Rolling 12 scrolls so the current month sits at the top. The year arrows scroll to January of that year.</li>
       </ul>
       <div class="form-actions">
         <button class="primary" type="submit">Close</button>
@@ -866,6 +1074,10 @@
       </div>
     </form>
   </dialog>
+
+  <div class="range-floater" id="range-floater" hidden></div>
+  <div class="tip" id="tip" hidden></div>
+  <div class="day-list" id="day-list" hidden></div>
 
   <script src="planner.js"></script>
   <script src="app.js"></script>
