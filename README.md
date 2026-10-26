@@ -23,6 +23,18 @@
 - **Pin to desktop.** A still picture of your year, laid over your wallpaper and painted again at midnight. Pin or unpin it with the **Pin to desktop** button in the header, the `W` key, a right-click on the bar button, or an optional `Super+Shift+Y` shortcut. Nothing on the picture clicks or moves.
 - **Google Calendar, if you want it.** Optional and read-only. It is off by default. You bring your own Google OAuth client id and run `./serve`. See [year-planner/README.md](year-planner/README.md#google-calendar).
 
+## Screenshots
+
+All plans in these shots are demo data.
+
+| | |
+|---|---|
+| <img src="screenshots/fullscreen.png" alt="Full-screen board with Next and three Upcoming plans" width="460"><br>**Full screen.** A wide window shows Next plus three Upcoming plans. | <img src="screenshots/window.png" alt="Normal window with Next, Up next and Last" width="460"><br>**Normal window.** A narrower window keeps Next, Up next and Last on one line. |
+| <img src="screenshots/add-plan.png" alt="Add plan dialog filling in F1 Las Vegas Grand Prix" width="460"><br>**Add a plan.** Drag across days or press `N`, then name it, pick the type and color, and add a note. | <img src="screenshots/plan-detail.png" alt="A plan opened on the board with its note and photo" width="460"><br>**Open a plan.** Click a plan to see its note and photos right on the board. |
+| <img src="screenshots/plan-edit.png" alt="Edit plan dialog with a note, checklist and photo" width="460"><br>**Notes, checklists and photos.** Up to four images per plan. | |
+
+The barbecue photo is AI-generated for this demo.
+
 ## Privacy
 
 Everything stays on your machine.
@@ -126,6 +138,7 @@ oma-year-planner/
 ├── README.md         # this file
 ├── LICENSE           # MIT
 ├── preview.png       # screenshot
+├── screenshots/      # README gallery
 ├── manifest.json     # Omarchy plugin manifest
 ├── BarWidget.qml     # left-click opens, right-click pins the wallpaper
 └── year-planner/     # the app: index.html, CSS, plain JS, no dependencies
