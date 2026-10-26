@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.1.8
+
+### Security
+
+- The pin helper's token no longer appears on any command line. In 1.1.7, `./open` put it in Chromium's `--app` URL, and any local account can read process arguments from `/proc`. Now `./bridge launch` writes a small launcher page next to the token, mode 0600 in the user's 0700 runtime folder, that forwards to the planner with the token in the URL fragment. Chromium gets only the launcher's path, and the helper deletes it after 30 seconds. Thanks to @HANCORE-linux for the report.
+- `./serve` no longer prints the token. It prints the path of a private launcher page for `http://localhost:8080` (deleted after ten minutes), and it now listens on `127.0.0.1` only.
+- The tests check that `./open` never hands the token to Chromium, that launcher pages are private and expire, and that no running process has the token in its arguments.
+
 ## 1.1.7
 
 ### Security

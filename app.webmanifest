@@ -4,7 +4,7 @@
   "description": "A scrolling year board for plans and trips.",
   "start_url": "./index.html",
   "scope": "./",
-  "version": "1.1.7",
+  "version": "1.1.8",
   "display": "standalone",
   "background_color": "#000d04",
   "theme_color": "#000d04",
