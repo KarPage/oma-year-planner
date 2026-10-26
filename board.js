@@ -620,7 +620,6 @@ function scrollToMonth(y, m, smooth) {
 
 function centerOnToday(smooth) {
   var today = todayParts();
-  var iso = cellDate(today.y, today.m, today.d);
   var month = board.querySelector('.month[data-ym="' + today.y + "-" + Planner.pad(today.m) + '"]');
   if (!month) return;
   board.classList.add("today-view");
@@ -634,23 +633,9 @@ function centerOnToday(smooth) {
   var maxTop = Math.max(0, board.scrollHeight - board.clientHeight);
   if (top < 0) top = 0;
   if (top > maxTop) top = maxTop;
-  var left = board.scrollLeft;
-  var target = board.querySelector('.cell[data-date="' + iso + '"]');
-  if (!target) target = board.querySelector('.daynum[data-day="' + today.d + '"]');
-  if (target) {
-    var cellRect = target.getBoundingClientRect();
-    var away = board.querySelector(".away-head");
-    var awayW = away ? away.getBoundingClientRect().width : 0;
-    var midX = boardRect.left + monthRect.width + Math.max(0, boardRect.width - monthRect.width - awayW) / 2;
-    left = board.scrollLeft + (cellRect.left + cellRect.width / 2 - midX);
-    var maxLeft = Math.max(0, board.scrollWidth - board.clientWidth);
-    if (left < 0) left = 0;
-    if (left > maxLeft) left = maxLeft;
-  }
   var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   board.scrollTo({
     top: top,
-    left: left,
     behavior: smooth && !reduce ? "smooth" : "instant"
   });
 }

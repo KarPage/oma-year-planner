@@ -2,7 +2,7 @@
 
 A scrolling year board for plans and trips. It is one HTML page, a stylesheet, and a few plain scripts. There is no build step and no runtime dependencies.
 
-Your data stays on your device. Plans are saved in this browser under `year-planner/v1`. Images are saved in IndexedDB, not in that plan list. Nothing is sent to a server.
+Your data stays on your device. Plans are saved in this browser under `year-planner/v1`. Images are saved in IndexedDB, not in that plan list. Nothing is sent to a server unless you connect Google Calendar, which is optional and off by default.
 
 Screenshots for a release live in [screenshots/](screenshots/).
 
@@ -34,6 +34,33 @@ Then open `http://localhost:8080`.
 
 ```sh
 node test.js
+```
+
+## Wallpaper mode
+
+A still picture of the board, laid over the desktop. Nothing on it clicks or moves.
+
+```
+./wallpaper pin       lock the board onto the wallpaper
+./wallpaper unpin     put the old wallpaper back, then open the planner
+./wallpaper toggle    pin if it is loose, unpin if it is locked
+./wallpaper refresh   paint it again while it is pinned
+./wallpaper status    say whether it is pinned
+```
+
+Left-click the bar icon: `./open`. Right-click: `./wallpaper toggle`.
+
+While it is pinned, the picture is painted again at midnight, and again when the planner window closes.
+
+It needs Chromium and ImageMagick (`magick`). Pinning saves your wallpaper path and the pictures in `~/.local/state/oma-year`, and adds a user timer, `~/.config/systemd/user/oma-year-wallpaper.{service,timer}`, for the midnight repaint. To draw your plans, it copies Chromium's local storage into a temporary folder, takes the picture there, and deletes the copy.
+
+To remove it all:
+
+```sh
+./wallpaper unpin
+systemctl --user disable --now oma-year-wallpaper.timer
+rm -f ~/.config/systemd/user/oma-year-wallpaper.service ~/.config/systemd/user/oma-year-wallpaper.timer
+rm -rf ~/.local/state/oma-year
 ```
 
 ## Google Calendar
