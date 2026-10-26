@@ -188,10 +188,35 @@ h1.today-headline {
   line-height: 1;
   color: var(--muted);
 }
-#gcal-connect {
+#gcal-connect,
+#pin-desk {
   display: inline-flex;
   align-items: center;
   gap: 8px;
+}
+#pin-desk svg { width: 16px; height: 16px; display: block; flex: none; }
+#pin-desk:disabled { opacity: 0.55; }
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 28px;
+  transform: translateX(-50%);
+  z-index: 80;
+  margin: 0;
+  max-width: min(40rem, calc(100vw - 32px));
+  padding: 10px 14px;
+  border: 1px solid var(--line-strong);
+  background: color-mix(in srgb, var(--bg) 92%, var(--fg));
+  color: var(--fg);
+  font-size: 14px;
+  line-height: 1.35;
+  text-align: center;
+}
+.toast[hidden] { display: none; }
+.help-pin {
+  margin: 0 0 12px;
+  color: var(--fg);
+  font-size: 14px;
 }
 .gcal-tile {
   align-items: flex-start;

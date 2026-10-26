@@ -48,9 +48,13 @@ A still picture of the board, laid over the desktop. Nothing on it clicks or mov
 ./wallpaper status    say whether it is pinned
 ```
 
+In the planner, **Pin to desktop** does the same thing. Press `W`, or `Super+Shift+Y` from anywhere.
+
 Left-click the bar icon: `./open`. Right-click: `./wallpaper toggle`.
 
 While it is pinned, the picture is painted again at midnight, and again when the planner window closes.
+
+The page is a local file, so it cannot run the pin command itself. `./open` starts a helper that listens only on `127.0.0.1:47321`.
 
 It needs Chromium and ImageMagick (`magick`). Pinning saves your wallpaper path and the pictures in `~/.local/state/oma-year`, and adds a user timer, `~/.config/systemd/user/oma-year-wallpaper.{service,timer}`, for the midnight repaint. To draw your plans, it copies Chromium's local storage into a temporary folder, takes the picture there, and deletes the copy.
 
@@ -94,6 +98,8 @@ Calendar sync state (which calendars, the sync token, and the account address) i
 | Enter | Edit |
 | Esc | Close |
 | Ctrl+Z | Undo |
+| W | Pin or unpin the desktop |
+| Super+Shift+Y | Pin or unpin the desktop, even when the planner is closed |
 
 ## Privacy
 

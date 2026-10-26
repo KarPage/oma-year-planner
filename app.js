@@ -50,6 +50,60 @@ document.getElementById("help").addEventListener("close", function () {
 document.getElementById("keys-btn").addEventListener("click", function () {
   openHelp("shortcuts");
 });
+
+var PIN_BRIDGE = "http://127.0.0.1:47321";
+var pinBusy = false;
+
+function showToast(text) {
+  var toast = document.getElementById("toast");
+  if (!toast) return;
+  toast.textContent = text;
+  toast.hidden = false;
+  clearTimeout(showToast.timer);
+  showToast.timer = setTimeout(function () { toast.hidden = true; }, 7000);
+}
+
+function paintPin(pinned) {
+  var button = document.getElementById("pin-desk");
+  var label = document.getElementById("pin-desk-label");
+  if (!button || !label) return;
+  label.textContent = pinned ? "Unpin" : "Pin to desktop";
+  button.setAttribute("aria-pressed", pinned ? "true" : "false");
+  button.title = pinned
+    ? "Take the board off the desktop"
+    : "Pin the year board to the desktop wallpaper";
+}
+
+function togglePin() {
+  var button = document.getElementById("pin-desk");
+  if (pinBusy) return;
+  pinBusy = true;
+  if (button) button.disabled = true;
+  fetch(PIN_BRIDGE + "/toggle", { method: "POST" }).then(function (res) {
+    if (!res.ok) throw new Error("pin");
+    return res.json();
+  }).then(function (data) {
+    paintPin(!!data.pinned);
+    if (data.pinned) {
+      showToast("Pinned to your desktop. Press Super+Shift+Y or click the calendar icon in the top bar to unpin.");
+    } else {
+      showToast("Desktop wallpaper restored.");
+    }
+  }).catch(function () {
+    showToast("Couldn't reach the desktop helper. Open the planner with ./open.");
+  }).then(function () {
+    pinBusy = false;
+    if (button) button.disabled = false;
+  });
+}
+
+document.getElementById("pin-desk").addEventListener("click", togglePin);
+fetch(PIN_BRIDGE + "/status").then(function (res) {
+  if (!res.ok) throw new Error("status");
+  return res.json();
+}).then(function (data) {
+  paintPin(!!data.pinned);
+}).catch(function () {});
 document.getElementById("help-keys-btn").addEventListener("click", function () {
   var boardKeys = document.getElementById("key-board");
   var open = boardKeys.hidden;

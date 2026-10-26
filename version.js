@@ -1,2 +1,2 @@
 /* Single release version. The manifest, service worker, and help footer use it. */
-var VERSION = "1.0.2";
+var VERSION = "1.0.3";

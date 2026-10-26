@@ -567,6 +567,9 @@ document.addEventListener("keydown", function (event) {
   }
   if (event.key === "t" || event.key === "T") {
     document.getElementById("today").click();
+  } else if (event.key === "w" || event.key === "W") {
+    event.preventDefault();
+    if (typeof togglePin === "function") togglePin();
   } else if (event.key === "[") {
     scrollToMonth(Math.max(RANGE_START, year - 1), 1, true);
   } else if (event.key === "]") {

@@ -5,6 +5,7 @@
 - Optional read-only Google Calendar connect. Events stay in this browser. Disconnect removes them.
 - Today centers the current month and day. The header keyboard button opens help.
 - The year grid stays within the window. Today centers the month vertically only.
+- Pin to desktop from the header, with W and Super+Shift+Y.
 - Wallpaper mode. Right-click the bar button to pin the board onto the wallpaper, and again to put your wallpaper back.
 
 ## 1.0.0
