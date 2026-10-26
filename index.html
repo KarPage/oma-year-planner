@@ -138,60 +138,148 @@
     .primary:hover { filter: brightness(1.08); }
 
     .intro {
-      display: block;
+      display: flex;
+      flex-direction: column;
       width: 100%;
-      padding: 12px 16px 14px;
+      min-width: 0;
+      padding: 0;
       border-top: 1px solid var(--line);
       border-bottom: 1px solid var(--line);
-      background: color-mix(in srgb, var(--fg) 3%, transparent);
+      background:
+        linear-gradient(180deg, color-mix(in srgb, var(--accent) 8%, transparent), transparent 72%),
+        color-mix(in srgb, var(--bg-deep) 42%, var(--bg));
     }
-    .hud {
+    .dash {
       display: flex;
       flex-wrap: wrap;
-      align-items: flex-end;
-      justify-content: center;
-      gap: 14px 20px;
+      align-items: stretch;
       width: 100%;
+      min-width: 0;
+      min-height: 44px;
     }
-    .hud-side {
+    .stats {
       display: flex;
-      flex: 1 1 100%;
-      flex-wrap: wrap;
-      align-items: center;
-      justify-content: center;
-      gap: 10px;
+      flex: none;
+      align-items: stretch;
+      min-width: 0;
     }
-    .stats { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px; }
     .stat-box {
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      min-width: 76px;
-      min-height: 64px;
-      padding: 8px 10px 6px;
-      border: 1px solid var(--line-strong);
-      background: color-mix(in srgb, var(--fg) 4%, transparent);
+      gap: 3px;
+      min-width: 4.6rem;
+      padding: 6px 12px 5px;
+      border-right: 1px solid var(--line);
     }
     .stat-box b {
       font-family: var(--mono);
       font-size: 22px;
-      font-weight: 600;
+      font-weight: 650;
       line-height: 1;
-      color: var(--fg);
-      font-variant-numeric: tabular-nums;
+      letter-spacing: 0.06em;
+      color: var(--accent);
+      font-variant-numeric: tabular-nums lining-nums;
+      text-shadow:
+        0 0 6px color-mix(in srgb, var(--accent) 70%, transparent),
+        0 0 14px color-mix(in srgb, var(--accent) 28%, transparent);
     }
     .stat-box span {
-      margin-top: 6px;
       max-width: 9em;
+      font-family: var(--mono);
       font-size: 9px;
-      font-weight: 600;
-      letter-spacing: 0.08em;
+      font-weight: 650;
+      letter-spacing: 0.14em;
       text-transform: uppercase;
       text-align: center;
-      line-height: 1.2;
+      line-height: 1;
       color: var(--muted);
     }
+    .dash-rhythm {
+      flex: 1 1 12rem;
+      min-width: 0;
+      display: flex;
+      align-items: center;
+      overflow: hidden;
+      border-right: 1px solid var(--line);
+    }
+    .dash-track {
+      display: flex;
+      width: max-content;
+      min-width: 100%;
+      align-items: center;
+    }
+    .dash-track.is-long { animation: dash-marquee 32s linear infinite; }
+    .dash-set {
+      display: flex;
+      flex: none;
+      align-items: center;
+      gap: 18px;
+      min-width: 0;
+      padding: 0 14px;
+    }
+    .dash-rhythm:hover .dash-track.is-long,
+    .dash-rhythm:focus-within .dash-track.is-long { animation-play-state: paused; }
+    @keyframes dash-marquee {
+      from { transform: translateX(0); }
+      to { transform: translateX(-50%); }
+    }
+    .dash-event {
+      display: inline-flex;
+      align-items: baseline;
+      gap: 8px;
+      min-width: 0;
+      max-width: 100%;
+      padding: 0;
+      border: 0;
+      background: transparent;
+      color: var(--fg);
+      font: inherit;
+      text-align: left;
+    }
+    .dash-event .k,
+    .dash-event .unit {
+      flex: none;
+      font-family: var(--mono);
+      font-size: 9px;
+      font-weight: 650;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+    .dash-event .name {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .dash-event .num {
+      flex: none;
+      font-family: var(--mono);
+      font-size: 20px;
+      font-weight: 650;
+      letter-spacing: 0.04em;
+      font-variant-numeric: tabular-nums lining-nums;
+      color: var(--accent);
+      text-shadow: 0 0 8px color-mix(in srgb, var(--accent) 55%, transparent);
+    }
+    .dash-empty {
+      margin: 0;
+      color: var(--muted);
+      font-size: 13px;
+    }
+    .range-note {
+      margin: 0;
+      padding: 3px 12px 4px;
+      border-top: 1px solid var(--line);
+      color: var(--muted);
+      font-family: var(--mono);
+      font-size: 11px;
+      letter-spacing: 0.04em;
+      text-align: center;
+    }
+    .range-note[hidden] { display: none; }
 
     .tools { display: flex; align-items: center; justify-content: flex-end; gap: 16px; }
     .filters { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
@@ -211,47 +299,63 @@
     }
     .dot { width: 8px; height: 8px; background: var(--dot, var(--muted)); }
 
-    .search {
+    label.search {
       display: flex;
+      flex-direction: row;
       align-items: center;
-      gap: 8px;
-      flex: 1 1 220px;
-      width: auto;
-      min-width: 180px;
-      max-width: 320px;
-      height: 64px;
-      margin: 0;
-      padding: 0 12px;
-      color: var(--muted);
+      justify-content: flex-start;
+      gap: 6px;
+      align-self: center;
+      flex: 0 0 auto;
+      width: 220px;
+      max-width: min(240px, 100%);
+      height: 32px;
+      margin: 6px 8px 6px auto;
+      padding: 0 8px;
       border: 1px solid var(--line-strong);
       background: var(--bg);
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 400;
+      line-height: 1;
     }
-    .search:focus-within {
+    label.search:focus-within {
       border-color: var(--accent);
       color: var(--accent);
     }
-    .search svg { flex: none; }
-    .search input {
-      width: 100%;
+    label.search svg { flex: none; display: block; }
+    label.search input {
+      appearance: none;
+      -webkit-appearance: none;
+      display: block;
+      flex: 1 1 auto;
+      width: auto;
       min-width: 0;
-      height: 100%;
-      border: 0;
-      background: transparent;
-      padding: 0;
-      outline: none;
-      color: var(--fg);
-      font-size: 14px;
-    }
-    .search input::placeholder { color: var(--muted); }
-
-    .rhythm {
-      flex: 1 1 100%;
+      height: 30px;
       margin: 0;
-      text-align: center;
-      color: var(--fg-dim);
-      font-size: 15px;
-      letter-spacing: -0.01em;
-      cursor: pointer;
+      padding: 0;
+      border: 0;
+      border-radius: 0;
+      outline: none;
+      background: transparent;
+      box-shadow: none;
+      color: var(--fg);
+      font: inherit;
+      font-size: 13px;
+      line-height: 30px;
+    }
+    label.search input::-webkit-search-decoration,
+    label.search input::-webkit-search-cancel-button,
+    label.search input::-webkit-search-results-button,
+    label.search input::-webkit-search-results-decoration {
+      -webkit-appearance: none;
+      appearance: none;
+      display: none;
+    }
+    label.search input::placeholder {
+      color: var(--muted);
+      opacity: 1;
+      line-height: 30px;
     }
 
     .stage {
@@ -310,10 +414,13 @@
     .dayhead {
       position: sticky;
       top: 0;
-      z-index: 8;
+      z-index: 9;
       height: var(--head);
+      min-height: 0;
+      /* Cover a subpixel seam so the previous month cannot peek past the snap. */
+      box-shadow: 0 1px 0 color-mix(in srgb, var(--accent) 9%, var(--bg));
     }
-    .corner { z-index: 2; color: var(--muted); font-size: 10px; font-weight: 500; }
+    .corner { color: var(--muted); font-size: 10px; font-weight: 500; }
     .daynum { color: var(--fg); font-size: 11px; font-weight: 600; }
     .daynum.today {
       color: var(--accent);
@@ -353,14 +460,26 @@
       height: 22px;
       display: flex;
       align-items: center;
-      padding: 0 12px;
-      letter-spacing: 0.18em;
+      justify-content: center;
+      gap: 14px;
+      padding: 0 16px;
+      letter-spacing: 0.16em;
       text-transform: uppercase;
-      font-size: 11px;
+      font-size: 16px;
       font-weight: 650;
+      line-height: 1;
       color: var(--accent);
       background: color-mix(in srgb, var(--accent) 14%, var(--bg));
       border-bottom: 1px solid color-mix(in srgb, var(--fg) 16%, transparent);
+      scroll-snap-align: none;
+      z-index: 1;
+    }
+    .year-mark { flex: none; }
+    .year-rule {
+      flex: 1 1 auto;
+      height: 1px;
+      background: color-mix(in srgb, var(--accent) 55%, transparent);
+      pointer-events: none;
     }
     .month-total {
       display: grid;
@@ -456,22 +575,24 @@
       overflow: hidden;
     }
     .fill .label {
+      flex: 0 1 auto;
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
       min-width: 0;
+      text-align: left;
     }
     .fill .count { flex: none; opacity: 0.85; }
     .fill .edge { flex: none; font-weight: 700; }
     .count-short { display: none; }
     .bar.cont-before .fill {
-      mask-image: linear-gradient(to right, transparent, #000 14px);
+      mask-image: linear-gradient(to right, transparent, #000 10px);
     }
     .bar.cont-after .fill {
-      mask-image: linear-gradient(to left, transparent, #000 14px);
+      mask-image: linear-gradient(to left, transparent, #000 10px);
     }
     .bar.cont-before.cont-after .fill {
-      mask-image: linear-gradient(to right, transparent, #000 14px, #000 calc(100% - 14px), transparent);
+      mask-image: linear-gradient(to right, transparent, #000 10px, #000 calc(100% - 10px), transparent);
     }
     .fill.single { padding: 0 4px; }
     .fill.single .label {
@@ -824,7 +945,7 @@
       .calendar { grid-template-columns: 5.4rem repeat(31, minmax(0, 1fr)) 3.1rem; }
       .month .name { font-size: 17px; }
       .bar:not(.single) .fill {
-        padding: 0 clamp(8px, 0.8vw, 18px);
+        padding: 0 14px;
         font-size: clamp(12px, 50cqh, 15px);
       }
     }
@@ -854,38 +975,15 @@
       .icon-btn { width: 30px; }
       .ghost, .primary { padding: 0 8px; }
       .primary { height: 32px; }
-      .intro { padding: 6px 8px; }
-      .hud { gap: 4px 8px; }
-      .hud-side { gap: 6px; }
-      .rhythm { font-size: 13px; }
-      .stats {
-        flex-wrap: nowrap;
-        gap: 8px;
-        padding: 2px 8px;
-        border: 1px solid var(--line-strong);
-        background: color-mix(in srgb, var(--fg) 4%, transparent);
-      }
-      .stat-box {
-        flex-direction: row;
-        align-items: baseline;
-        gap: 4px;
-        min-width: 0;
-        min-height: 0;
-        padding: 0;
-        border: 0;
-        background: transparent;
-      }
-      .stat-box b { font-size: 13px; }
-      .stat-box span {
-        margin-top: 0;
-        max-width: none;
-        letter-spacing: 0.04em;
-      }
-      .search {
+      .intro { padding: 0; }
+      .stat-box { min-width: 3.6rem; padding: 5px 8px 4px; }
+      .stat-box b { font-size: 18px; letter-spacing: 0.04em; }
+      .stat-box span { letter-spacing: 0.08em; }
+      .dash-event .num { font-size: 16px; }
+      label.search {
+        width: min(200px, 100%);
         height: 32px;
-        min-width: 0;
-        flex: 1 1 8rem;
-        max-width: none;
+        margin: 4px 8px 4px auto;
       }
       .board { --head: 20px; }
       .calendar { grid-template-columns: 2.4rem repeat(31, minmax(0, 1fr)) 1.25rem; }
@@ -904,12 +1002,22 @@
         line-height: 1;
         font-weight: 650;
       }
-      .bar:not(.single) .fill { padding: 0 3px; font-size: clamp(8px, 42cqh, 11px); }
+      .bar:not(.single) .fill { padding: 0 14px; font-size: clamp(8px, 42cqh, 11px); }
       .count-full { display: none; }
       .count-short { display: inline; }
       .foot { flex-wrap: wrap; gap: 6px; }
       .backup { flex-wrap: wrap; gap: 8px; }
       .backup button { font-size: 12px; }
+    }
+
+    .bar:not(.single) .fill:has(.handle.w) { padding-left: 16px; }
+    .bar:not(.single) .fill:has(.handle.e) { padding-right: 16px; }
+    @media (prefers-reduced-motion: reduce) {
+      .dash-track,
+      .dash-track.is-long { animation: none; transform: none; }
+      .dash-rhythm { overflow: hidden; }
+      .dash-set { flex-wrap: wrap; min-width: 0; }
+      .dash-track { width: 100%; min-width: 0; }
     }
   </style>
   <link rel="stylesheet" href="theme.css">
@@ -954,20 +1062,19 @@
     <button class="primary" id="add" type="button">+ Add plan</button>
   </header>
 
-  <section class="intro">
-    <div class="hud">
-      <p class="rhythm" id="rhythm"></p>
-      <div class="hud-side">
-        <div class="stats" id="stats"></div>
-        <label class="search">
-          <svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true">
-            <circle cx="7" cy="7" r="4.25" fill="none" stroke="currentColor" stroke-width="1.4"/>
-            <path d="M10.4 10.4 L13.2 13.2" stroke="currentColor" stroke-width="1.4"/>
-          </svg>
-          <input id="q" type="search" placeholder="Search plans" autocomplete="off">
-        </label>
-      </div>
+  <section class="intro" aria-label="Overview">
+    <div class="dash">
+      <div class="stats" id="stats"></div>
+      <div class="dash-rhythm" id="rhythm" aria-label="Next and last plans"></div>
+      <label class="search">
+        <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true">
+          <circle cx="7" cy="7" r="4.25" fill="none" stroke="currentColor" stroke-width="1.4"/>
+          <path d="M10.4 10.4 L13.2 13.2" stroke="currentColor" stroke-width="1.4"/>
+        </svg>
+        <input id="q" type="search" placeholder="Search plans" aria-label="Search plans" autocomplete="off" spellcheck="false">
+      </label>
     </div>
+    <p class="range-note" id="range-note" hidden></p>
   </section>
 
   <div class="stage">
@@ -1022,8 +1129,8 @@
         <li>Drag a bar to move it. Drag either end to resize it. Double-click a bar to edit its note.</li>
         <li>A one-day plan is a thin line at the bottom of that day. Several stack, and a small +N stands in for the rest. Hover lists them. Click opens the list so you can pick or edit one.</li>
         <li>Drag the month names, or a year divider, to scroll the board. The wheel snaps to a month.</li>
-        <li><kbd>T</kbd> jumps to today. <kbd>N</kbd> adds a plan. <kbd>←</kbd> <kbd>→</kbd> move the focused day. <kbd>↑</kbd> <kbd>↓</kbd> move it by a month, or scroll the board when no day is focused. <kbd>Shift</kbd>+<kbd>↑</kbd> <kbd>↓</kbd> scroll a month while a day is focused. <kbd>Page Up</kbd> <kbd>Page Down</kbd> move about six months. <kbd>Home</kbd> <kbd>End</kbd> jump to the ends. <kbd>Enter</kbd> edits. <kbd>Esc</kbd> closes. <kbd>?</kbd> opens this list. <kbd>/</kbd> searches. <kbd>Ctrl</kbd>+<kbd>Z</kbd> undoes.</li>
-        <li>The board shows this year and next, and grows if a plan falls outside that. Rolling 12 scrolls so the current month sits at the top. The year arrows scroll to January of that year.</li>
+        <li><kbd>T</kbd> jumps to today. <kbd>N</kbd> adds a plan. <kbd>←</kbd> <kbd>→</kbd> move the focused day. <kbd>↑</kbd> <kbd>↓</kbd> move it by a month, or scroll the board when no day is focused. <kbd>Shift</kbd>+<kbd>↑</kbd> <kbd>↓</kbd> scroll a month while a day is focused. <kbd>Page Up</kbd> <kbd>Page Down</kbd> move about six months. <kbd>Home</kbd> <kbd>End</kbd> jump to the ends. <kbd>Enter</kbd> edits. <kbd>Esc</kbd> closes. In the search, <kbd>Esc</kbd> clears the text, then blurs. <kbd>?</kbd> opens this list. <kbd>/</kbd> searches. <kbd>Ctrl</kbd>+<kbd>Z</kbd> undoes.</li>
+        <li>The board shows this year and next. It can reach two years back and three years ahead when a plan falls in that window. Plans further out stay in your data and in search. Rolling 12 scrolls so the current month sits at the top. The year arrows scroll to January of that year.</li>
       </ul>
       <div class="form-actions">
         <button class="primary" type="submit">Close</button>

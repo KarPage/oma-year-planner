@@ -84,16 +84,51 @@ var Planner = (function () {
     if (!y) y = new Date().getFullYear();
     var start = y;
     var end = y + 1;
+    /* At most two years before the current year and three years after it.
+       A typo year must not stretch the board. */
+    var minY = y - 2;
+    var maxY = y + 3;
     (plans || []).forEach(function (plan) {
       if (!plan) return;
       var a = parse(plan.start);
       var b = parse(plan.end || plan.start);
-      if (a && a.y < start) start = a.y;
-      if (a && a.y > end) end = a.y;
-      if (b && b.y < start) start = b.y;
-      if (b && b.y > end) end = b.y;
+      if (!a && !b) return;
+      var lo = a && b ? Math.min(a.y, b.y) : (a || b).y;
+      var hi = a && b ? Math.max(a.y, b.y) : (a || b).y;
+      var from = Math.max(lo, minY);
+      var to = Math.min(hi, maxY);
+      if (from > to) return;
+      if (from < start) start = from;
+      if (to > end) end = to;
     });
     return { start: start, end: end };
+  }
+
+  function plansOutsideRange(plans, startYear, endYear) {
+    var from = startYear + "-01-01";
+    var to = endYear + "-12-31";
+    var out = [];
+    (plans || []).forEach(function (plan) {
+      if (!plan || !plan.start) return;
+      if (!overlapsRange(plan, from, to)) out.push(plan);
+    });
+    return out;
+  }
+
+  function planCategory(plan) {
+    return String((plan && (plan.tag || plan.category)) || "").trim();
+  }
+
+  function samePlanContent(a, b) {
+    if (!a || !b) return false;
+    var aEnd = a.end || a.start;
+    var bEnd = b.end || b.start;
+    return String(a.title || "").trim() === String(b.title || "").trim()
+      && String(a.start || "") === String(b.start || "")
+      && String(aEnd || "") === String(bEnd || "")
+      && planCategory(a) === planCategory(b)
+      && String(a.note || "").trim() === String(b.note || "").trim()
+      && String(a.color || "").trim().toLowerCase() === String(b.color || "").trim().toLowerCase();
   }
 
   function copyPlan(plan, id) {
@@ -123,7 +158,9 @@ var Planner = (function () {
     (incoming || []).forEach(function (plan, index) {
       if (!plan) return;
       var copy = copyPlan(plan, plan.id);
-      if (!copy.id || byId[copy.id]) {
+      var existing = copy.id ? byId[copy.id] : null;
+      if (existing && samePlanContent(existing, plan)) return;
+      if (!copy.id || existing) {
         var id = nextId ? nextId(copy, index) : "";
         if (!id || byId[id]) id = "import-" + order.length;
         while (byId[id]) id += "x";
@@ -510,6 +547,33 @@ var Planner = (function () {
       { start: "nope", end: "nope" }
     ]);
     if (rollingWide.start !== 2025 || rollingWide.end !== 2028) errors.push("rolling wide");
+    var rollingCap = rollingRange({ y: 2026, m: 6, d: 15 }, [
+      { start: "2001-01-01", end: "2001-01-05" },
+      { start: "2023-12-01", end: "2023-12-02" },
+      { start: "2024-02-01", end: "2024-02-02" },
+      { start: "2029-11-01", end: "2029-11-03" },
+      { start: "2099-01-01", end: "2099-01-08" }
+    ]);
+    if (rollingCap.start !== 2024 || rollingCap.end !== 2029) {
+      errors.push("rolling cap " + rollingCap.start + "-" + rollingCap.end);
+    }
+    var rollingSpan = rollingRange({ y: 2026, m: 1, d: 1 }, [
+      { start: "2023-06-01", end: "2030-06-01" }
+    ]);
+    if (rollingSpan.start !== 2024 || rollingSpan.end !== 2029) errors.push("rolling span cap");
+    var rollingTypo = rollingRange({ y: 2026, m: 1, d: 1 }, [
+      { start: "2099-01-01", end: "2099-01-08" }
+    ]);
+    if (rollingTypo.start !== 2026 || rollingTypo.end !== 2027) errors.push("rolling typo");
+    var outside = plansOutsideRange([
+      { id: "old", title: "Old", start: "2001-01-01", end: "2001-01-02" },
+      { id: "edge", title: "Edge", start: "2023-12-30", end: "2024-01-02" },
+      { id: "in", title: "In", start: "2026-05-01", end: "2026-05-02" },
+      { id: "typo", title: "Typo", start: "2099-01-01", end: "2099-01-04" }
+    ], 2024, 2029);
+    if (outside.length !== 2 || outside[0].id !== "old" || outside[1].id !== "typo") {
+      errors.push("outside range");
+    }
     var kept = [{ id: "a", title: "Keep", start: "2026-01-01", end: "2026-01-02", images: [{ name: "m", src: "data:image/png;base64,aaa" }] }];
     var imported = [{ id: "a", title: "Imported", start: "2026-02-01", end: "2026-02-02", images: [] }];
     var seq = 0;
@@ -524,6 +588,27 @@ var Planner = (function () {
     ], function () { seq += 1; return "id-" + seq; });
     if (dupIncoming.length !== 2 || dupIncoming[0].id === dupIncoming[1].id) errors.push("merge dup incoming");
     if (dupIncoming[0].title !== "First" || dupIncoming[1].title !== "Second") errors.push("merge both incoming");
+    var idCalls = 0;
+    var identical = mergePlans(
+      [{ id: "a", title: "Keep", tag: "Trip", color: "#74a869", note: "n", start: "2026-03-01", end: "2026-03-02", images: [{ name: "m", src: "data:image/png;base64,aaa" }] }],
+      [{ id: "a", title: "Keep", category: "Trip", color: "#74A869", note: " n ", start: "2026-03-01", end: "2026-03-02" }],
+      function () { idCalls += 1; return "nope"; }
+    );
+    if (identical.length !== 1 || identical[0].id !== "a" || idCalls !== 0) errors.push("merge identical");
+    if (!identical[0].images || identical[0].images.length !== 1) errors.push("merge identical images");
+    var byNote = mergePlans(
+      [{ id: "a", title: "Keep", tag: "Trip", color: "#74a869", note: "n", start: "2026-03-01", end: "2026-03-02" }],
+      [{ id: "a", title: "Keep", tag: "Trip", color: "#74a869", note: "m", start: "2026-03-01", end: "2026-03-02" }],
+      function () { return "note-copy"; }
+    );
+    if (byNote.length !== 2 || byNote[1].id !== "note-copy" || byNote[1].note !== "m") errors.push("merge note differs");
+    var source = [
+      { id: "a", title: "Keep", tag: "Trip", color: "#74a869", note: "", start: "2026-01-01", end: "2026-01-02" },
+      { id: "b", title: "Other", tag: "Trip", color: "#37a388", note: "x", start: "2026-02-01", end: "2026-02-03" }
+    ];
+    var once = mergePlans([], source, function () { return "x"; });
+    var twice = mergePlans(once, source, function () { return "y"; });
+    if (twice.length !== 2 || twice[0].id !== "a" || twice[1].id !== "b") errors.push("merge reimport");
     var mixed = layout([
       { id: "span", title: "Span", start: "2026-05-01", end: "2026-05-10" },
       { id: "one", title: "One", start: "2026-05-04", end: "2026-05-04" },
@@ -549,6 +634,7 @@ var Planner = (function () {
     prettyDate: prettyDate,
     rangeCountLabel: rangeCountLabel,
     rollingRange: rollingRange,
+    plansOutsideRange: plansOutsideRange,
     mergePlans: mergePlans,
     isSingleDay: isSingleDay,
     daysInMonth: daysInMonth,
