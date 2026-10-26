@@ -14,7 +14,7 @@
   },
   "barWidget": {
     "displayName": "Oma Year Planner",
-    "description": "Open your year planner from the bar.",
+    "description": "Left-click opens the planner. Right-click pins it to the wallpaper.",
     "category": "Productivity",
     "aliases": [
       "year",

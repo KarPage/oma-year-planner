@@ -18,7 +18,7 @@
 - **Search** with `/`, **undo** with `Ctrl+Z`, and full keyboard navigation (press `?`).
 - **Backup and calendar files.** Export and import JSON backups, with or without images, and `.ics` calendar files.
 - **Matches your Omarchy theme.** The planner reads the colors from your active theme each time it opens.
-- **Bar button.** Installs as an Omarchy plugin with a calendar button that opens the planner.
+- **Bar button.** Left-click opens the planner. Right-click pins the board on the wallpaper, or puts your wallpaper back.
 
 ## Privacy
 
@@ -35,7 +35,7 @@ Everything stays on your machine.
 omarchy plugin add https://github.com/KarPage/oma-year-planner --enable
 ```
 
-This adds a calendar button to your bar. Click it to open the planner in its own app window, themed with your current Omarchy colors. If the button doesn't show up, add **Oma Year Planner** to the bar from the bar settings.
+This adds a calendar button to your bar. Left-click opens the planner in its own app window, themed with your current Omarchy colors. Right-click pins the board onto the wallpaper, or restores your wallpaper. If the button doesn't show up, add **Oma Year Planner** to the bar from the bar settings.
 
 You need Chromium (it ships with Omarchy) and Python 3 for the theme sync.
 
@@ -55,7 +55,21 @@ cd oma-year-planner/year-planner
 ./open
 ```
 
-`./open` syncs your Omarchy theme colors and opens the planner in its own app window. The colors go into `theme.local.css`, which is gitignored. Without it the planner uses the built-in Osaka Jade defaults.
+`./open` syncs your Omarchy theme colors and opens the planner in its own app window. If that window is already open, it is focused instead of opened again. The colors go into `theme.local.css`, which is gitignored. Without it the planner uses the built-in Osaka Jade defaults.
+
+### Wallpaper
+
+A still picture of the board, laid over the desktop. Nothing on it clicks or moves.
+
+```
+./wallpaper pin       lock the board onto the wallpaper
+./wallpaper unpin     put the old wallpaper back, then open the planner
+./wallpaper toggle    pin if it is loose, unpin if it is locked
+./wallpaper refresh   paint it again while it is pinned
+./wallpaper status    say whether it is pinned
+```
+
+Right-click the bar button to toggle it. While it is pinned, the picture is painted again at midnight, and again when the planner window closes.
 
 To install it as an offline app (PWA), serve the folder and open it in Chromium:
 
@@ -85,17 +99,17 @@ oma-year-planner/
 ├── LICENSE           # MIT
 ├── preview.png       # screenshot
 ├── manifest.json     # Omarchy plugin manifest
-├── BarWidget.qml     # bar button that opens the planner
+├── BarWidget.qml     # left-click opens, right-click pins the wallpaper
 └── year-planner/     # the app: index.html, CSS, plain JS, no dependencies
     ├── branding/     # icon.svg, icon-512.png, lockup.svg, lockup.png
     ├── open          # theme sync + app window launcher
+    ├── wallpaper     # pin the board on the desktop
     └── serve         # local server for the offline app
 ```
 
 ## Roadmap
 
 - Optional read-only Google Calendar overlay. It would run in the browser only, with the `calendar.readonly` scope, no server, and no stored refresh tokens.
-- **Coming in the next release: wallpaper mode.** Pin the year board to your desktop as a see-through, locked wallpaper, and unpin it from the bar to get your normal wallpaper back.
 
 ## License
 
