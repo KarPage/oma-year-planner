@@ -222,3 +222,8 @@ if (document.fonts && document.fonts.ready) {
     fitMarquee();
   }).catch(function () {});
 }
+
+window.addEventListener("pointermove", onArmMove);
+window.addEventListener("pointermove", onPointerMove);
+window.addEventListener("pointerup", onPointerUp);
+window.addEventListener("pointercancel", onPointerCancel);
