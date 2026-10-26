@@ -107,6 +107,10 @@ function paintFullscreen() {
   var on = fullscreenOn();
   var button = document.getElementById("full-btn");
   document.documentElement.classList.toggle("is-full", on);
+  // Full screen from the browser or from the compositor: the window covers
+  // the whole screen, so give the top row room to breathe.
+  var edge = on || (window.innerWidth >= screen.width && window.innerHeight >= screen.height);
+  document.documentElement.classList.toggle("is-edge", edge);
   if (!button) return;
   button.classList.toggle("is-full", on);
   button.setAttribute("aria-pressed", on ? "true" : "false");
@@ -128,6 +132,7 @@ function toggleFullscreen() {
 
 document.getElementById("full-btn").addEventListener("click", toggleFullscreen);
 document.addEventListener("fullscreenchange", paintFullscreen);
+window.addEventListener("resize", paintFullscreen);
 paintFullscreen();
 fetch(PIN_BRIDGE + "/status").then(function (res) {
   if (!res.ok) throw new Error("status");

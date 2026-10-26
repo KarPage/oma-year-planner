@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.1.3
+
+- The desktop snapshot keeps clear of the top bar and the screen edges. It reads the space the bar reserves on each monitor (32 pixels if that is unknown) and adds a small margin, so the date row is never hidden under the bar on any screen.
+- Full screen, from the page or from the window manager, gives the top row a little more room.
+
 ## 1.1.2
 
 - Full screen sits just left of Add plan. F toggles it. Esc, or the window's own fullscreen key, keeps the icon in step. The wide dashboard is used while the page is full screen.

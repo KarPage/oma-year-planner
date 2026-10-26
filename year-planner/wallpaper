@@ -87,11 +87,38 @@ h = int(pick["height"])
 scale = float(pick.get("scale") or 1)
 if scale <= 0:
     scale = 1
+# The same image is shown on every monitor, scaled to cover it and cropped
+# around the centre. Keep the board clear of every bar and screen edge.
+# Hyprland reports the space bars reserve as [left, top, right, bottom] in
+# logical pixels. If that is missing, assume a 32 pixel top bar.
+gap = 12
+inset = [0.0, 0.0, 0.0, 0.0]
+for m in mons:
+    mw, mh = float(m["width"]), float(m["height"])
+    ms = float(m.get("scale") or 1) or 1
+    try:
+        res = [max(0, int(v)) for v in m.get("reserved")]
+        assert len(res) == 4
+    except (TypeError, ValueError, AssertionError):
+        res = [0, 32, 0, 0]
+    fit = max(mw / w, mh / h)
+    crop_x = (w - mw / fit) / 2
+    crop_y = (h - mh / fit) / 2
+    crops = [crop_x, crop_y, crop_x, crop_y]
+    for i in range(4):
+        inset[i] = max(inset[i], crops[i] + (res[i] + gap) * ms / fit)
+left, top, right, bottom = [int(round(v)) for v in inset]
+board_w = max(320, w - left - right)
+board_h = max(240, h - top - bottom)
 print("W=%d" % w)
 print("H=%d" % h)
 print("SCALE=%s" % scale)
-print("CSS_W=%d" % max(1, round(w / scale)))
-print("CSS_H=%d" % max(1, round(h / scale)))
+print("CSS_W=%d" % max(1, round(board_w / scale)))
+print("CSS_H=%d" % max(1, round(board_h / scale)))
+print("BOARD_X=%d" % left)
+print("BOARD_Y=%d" % top)
+print("BOARD_W=%d" % board_w)
+print("BOARD_H=%d" % board_h)
 ')"
 
   runtime=${XDG_RUNTIME_DIR:-/tmp}
@@ -155,8 +182,8 @@ PY
   stamp=$(date +%s%N)
   out=$STATE/render-$stamp.png
   magick "$wall" -resize "${W}x${H}^" -gravity center -extent "${W}x${H}" \
-    \( "$board" -resize "${W}x${H}!" -alpha set -channel A -evaluate set 78% +channel \) \
-    -composite "$out"
+    \( "$board" -resize "${BOARD_W}x${BOARD_H}!" -alpha set -channel A -evaluate set 78% +channel \) \
+    -gravity northwest -geometry "+${BOARD_X}+${BOARD_Y}" -composite "$out"
   [ -s "$out" ] || die "composite failed"
 
   rm -rf "$work"
