@@ -4,10 +4,10 @@
 cd "$(dirname "$0")" || exit 1
 ROOT=$(pwd)
 
-# file:// pages cannot run wallpaper themselves. This listens on 127.0.0.1 only.
-if ! curl -sf -o /dev/null --max-time 0.4 -H 'Origin: null' http://127.0.0.1:47321/status; then
-  setsid "$ROOT/bridge" >/dev/null 2>&1 < /dev/null &
-fi
+# file:// pages cannot run wallpaper themselves. The helper listens on
+# 127.0.0.1 only and needs a secret token, which the page gets in the URL
+# fragment. Without it the planner still works; only Pin to desktop is off.
+TOKEN=$("$ROOT/bridge" ensure 2>/dev/null) || TOKEN=""
 
 if command -v hyprctl >/dev/null 2>&1; then
   if hyprctl eval '
@@ -27,8 +27,9 @@ if command -v hyprctl >/dev/null 2>&1; then
 fi
 
 python3 ./apply-theme.py
-chromium --app="file://$ROOT/index.html"
+URL="file://$ROOT/index.html"
+[ -n "$TOKEN" ] && URL="$URL#bt=$TOKEN"
+chromium --app="$URL"
 code=$?
 "$ROOT/wallpaper" refresh >/dev/null 2>&1 || true
 exit "$code"
-

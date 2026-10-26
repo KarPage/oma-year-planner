@@ -44,3 +44,14 @@ if (worker.indexOf('importScripts("version.js")') === -1 || worker.indexOf('"yea
 }
 
 console.log("selfCheck ok");
+
+// The pin helper must refuse every request without its per-login token.
+var child = require("child_process");
+var bridgeTest = child.spawnSync("python3", [path.join(__dirname, "test-bridge.py")], { encoding: "utf8" });
+if (bridgeTest.error) {
+  console.log("bridge token check skipped (python3 not found)");
+} else {
+  process.stderr.write(bridgeTest.stderr || "");
+  process.stdout.write(bridgeTest.stdout || "");
+  if (bridgeTest.status !== 0) process.exit(1);
+}

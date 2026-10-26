@@ -53,6 +53,36 @@ document.getElementById("keys-btn").addEventListener("click", function () {
 
 var PIN_BRIDGE = "http://127.0.0.1:47321";
 var pinBusy = false;
+var BRIDGE_TOKEN_KEY = "year-planner/bridge-token";
+
+// ./open passes the desktop helper's secret in the URL fragment (#bt=...).
+// Keep it for this tab only, then take it out of the address.
+var bridgeToken = (function () {
+  var token = "";
+  var match = /(?:^#|&)bt=([0-9a-f]{64})(?:&|$)/.exec(location.hash || "");
+  if (match) {
+    token = match[1];
+    try { sessionStorage.setItem(BRIDGE_TOKEN_KEY, token); } catch (err) { /* private mode */ }
+    var rest = location.hash.replace(/(^#|&)bt=[0-9a-f]{64}/, "$1").replace(/^#&/, "#").replace(/&$/, "");
+    try {
+      history.replaceState(history.state, "", location.pathname + location.search + (rest === "#" ? "" : rest));
+    } catch (err) { /* ignore */ }
+  } else {
+    try { token = sessionStorage.getItem(BRIDGE_TOKEN_KEY) || ""; } catch (err) { token = ""; }
+  }
+  return token;
+})();
+
+function bridgeFetch(path, method) {
+  if (!bridgeToken) return Promise.reject(new Error("no-token"));
+  return fetch(PIN_BRIDGE + path, {
+    method: method || "GET",
+    cache: "no-store",
+    headers: { "X-Planner-Token": bridgeToken }
+  });
+}
+
+var PIN_HINT = "Pin to desktop needs the desktop helper. Open the planner from the bar menu or ./open.";
 
 function showToast(text) {
   var toast = document.getElementById("toast");
@@ -72,6 +102,7 @@ function paintPin(pinned) {
   button.title = pinned
     ? "Unpin from desktop: put your wallpaper back"
     : "Pin to desktop: show the year board as your wallpaper";
+  if (!bridgeToken) button.title = PIN_HINT;
 }
 
 function togglePin() {
@@ -81,7 +112,8 @@ function togglePin() {
   if (button) button.disabled = true;
   var label = document.getElementById("pin-desk-label");
   if (label) label.textContent = button && button.getAttribute("aria-pressed") === "true" ? "Unpinning\u2026" : "Pinning\u2026";
-  fetch(PIN_BRIDGE + "/toggle", { method: "POST" }).then(function (res) {
+  bridgeFetch("/toggle", "POST").then(function (res) {
+    if (res.status === 403) throw new Error("no-token");
     if (!res.ok) throw new Error("pin");
     return res.json();
   }).then(function (data) {
@@ -91,8 +123,10 @@ function togglePin() {
     } else {
       showToast("Desktop wallpaper restored.");
     }
-  }).catch(function () {
-    showToast("Couldn't reach the desktop helper. Open the planner with ./open.");
+  }).catch(function (err) {
+    paintPin(button && button.getAttribute("aria-pressed") === "true");
+    if (err && err.message === "no-token") showToast(PIN_HINT);
+    else showToast("Couldn't reach the desktop helper. Open the planner with ./open.");
   }).then(function () {
     pinBusy = false;
     if (button) button.disabled = false;
@@ -100,6 +134,7 @@ function togglePin() {
 }
 
 document.getElementById("pin-desk").addEventListener("click", togglePin);
+if (!bridgeToken && !window.OMA_WALLPAPER) paintPin(false);
 
 function fullscreenOn() {
   return !!document.fullscreenElement;
@@ -142,7 +177,8 @@ paintFullscreen();
 function checkPin() {
   // The wallpaper render loads this page too. It must not ask the helper.
   if (window.OMA_WALLPAPER || pinBusy || document.hidden) return;
-  fetch(PIN_BRIDGE + "/status").then(function (res) {
+  if (!bridgeToken) return;
+  bridgeFetch("/status").then(function (res) {
     if (!res.ok) throw new Error("status");
     return res.json();
   }).then(function (data) {

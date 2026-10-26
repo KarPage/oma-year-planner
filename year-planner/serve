@@ -3,7 +3,8 @@
 # Opening index.html as a file cannot install the offline app.
 cd "$(dirname "$0")" || exit 1
 ROOT=$(pwd)
-if ! curl -sf -o /dev/null --max-time 0.4 -H 'Origin: null' http://127.0.0.1:47321/status; then
-  setsid "$ROOT/bridge" >/dev/null 2>&1 < /dev/null &
+if TOKEN=$("$ROOT/bridge" ensure 2>/dev/null); then
+  # Open this link once; the page keeps the token for that tab.
+  echo "Open http://localhost:8080/#bt=$TOKEN to use Pin to desktop."
 fi
 exec python3 -m http.server 8080

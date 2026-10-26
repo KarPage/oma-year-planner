@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.1.7
+
+### Security
+
+- The pin helper on `127.0.0.1:47321` no longer trusts `Origin: null`. Any local file or sandboxed page sends that origin, so while the helper ran, an unrelated page that the browser let reach loopback could pin or unpin the wallpaper and turn on the midnight timer. Every request now needs a secret token: 32 random bytes in a mode 0600 file under `$XDG_RUNTIME_DIR`, readable only by you and gone at logout. `./open` hands it to the page in the URL fragment, the page keeps it for that tab, removes it from the address, and sends it in an `X-Planner-Token` header, which also forces a CORS preflight. The helper compares it in constant time and answers 403 otherwise. It also rejects unknown `Host` headers (DNS rebinding) and runs actions only on POST. The Origin check stays as a second layer. Thanks to @HANCORE-linux for the report.
+- A planner opened without the token still works. Pin to desktop then explains how to open it from the bar menu or `./open`. The bar menu and the key bind run the wallpaper script directly and are unchanged.
+
 ## 1.1.6
 
 - Rename the web app manifest to `app.webmanifest` so the repository has a single plugin `manifest.json` at its root, as the Omarchy marketplace requires.
