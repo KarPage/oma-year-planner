@@ -3,8 +3,11 @@
 
 A file:// page cannot run shell commands. ./open starts this on 127.0.0.1.
 It accepts only pin, unpin, toggle (POST) and status, ping (GET), and it
-never reads a request body. `./bridge ensure` starts it if needed and prints
-the token.
+never reads a request body.
+
+  ./bridge ensure          start the helper if it is not running
+  ./bridge launch          write a one-time launcher page and print its path
+  ./bridge launch served   the same, for the planner on http://localhost:8080
 
 Every request must carry the secret token in the X-Planner-Token header.
 The token is 32 random bytes kept in a mode 0600 file under $XDG_RUNTIME_DIR,
@@ -12,6 +15,12 @@ so only this user can read it, and it is gone at logout. ./open hands it to
 the page in the URL fragment. The Origin and Host checks below are kept as a
 second layer, but neither is ever enough on its own: Origin null is shared by
 every local file and sandboxed document.
+
+The token never goes on a command line, where any local account could read it
+from /proc. ./open runs `./bridge launch`, which writes a small page next to
+the token (mode 0600, in the 0700 folder) that forwards to the planner with
+the token in the URL fragment. Chromium gets only that page's path. The helper
+deletes launcher pages after LAUNCH_TTL seconds.
 """
 import hmac
 import json
@@ -19,6 +28,9 @@ import os
 import secrets
 import subprocess
 import sys
+import threading
+import time
+from urllib.parse import quote
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
@@ -28,6 +40,14 @@ PORT = int(os.environ.get("OMA_YEAR_BRIDGE_PORT") or 47321)
 ALLOWED = {"null", "http://localhost:8080", "http://127.0.0.1:8080"}
 HOSTS = {"127.0.0.1:%d" % PORT, "localhost:%d" % PORT}
 TOKEN_HEADER = "X-Planner-Token"
+SERVED_URL = "http://localhost:8080/"
+# Launcher pages: file name -> seconds before the helper deletes it.
+LAUNCHERS = {
+    # Named index.html in a folder called oma-year-planner, so the Chromium
+    # window class still names "year-planner" and "index.html" for focus/Quit.
+    "index.html": int(os.environ.get("OMA_YEAR_LAUNCH_TTL") or 30),
+    "served.html": int(os.environ.get("OMA_YEAR_SERVED_TTL") or 600),
+}
 
 
 def token_path():
@@ -200,39 +220,93 @@ def healthy(token):
 
 
 def ensure():
-    """Start the helper if needed, then print its token for ./open.
+    """Start the helper if needed. Return its token, or "" if it did not start.
 
-    The token goes to stdout only, never onto a command line.
+    The child gets no arguments, so nothing secret is on its command line.
     """
-    import time
     token = read_token()
-    if not healthy(token):
-        subprocess.Popen(
-            [sys.executable, os.path.abspath(__file__)],
-            stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL, start_new_session=True,
-        )
-        for _ in range(30):
-            time.sleep(0.1)
-            token = read_token()
-            if healthy(token):
-                break
-        else:
-            return 1
-    sys.stdout.write(token + "\n")
+    if healthy(token):
+        return token
+    subprocess.Popen(
+        [sys.executable, os.path.abspath(__file__)],
+        stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL, start_new_session=True,
+    )
+    for _ in range(30):
+        time.sleep(0.1)
+        token = read_token()
+        if healthy(token):
+            return token
+    return ""
+
+
+def write_private(path, text):
+    tmp = path + ".%d" % os.getpid()
+    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    with os.fdopen(fd, "w", encoding="utf-8") as fh:
+        fh.write(text)
+    os.replace(tmp, path)
+
+
+def launch(kind):
+    """Write a launcher page that forwards to the planner, print its path."""
+    token = ensure()
+    if not token:
+        return 1
+    if kind == "served":
+        name, target = "served.html", SERVED_URL
+    else:
+        name = "index.html"
+        target = "file://" + quote(os.path.join(ROOT, "index.html"))
+    target += "#bt=" + token
+    script = json.dumps(target).replace("<", "\\u003c")
+    page = (
+        "<!doctype html><meta charset=\"utf-8\">"
+        "<meta name=\"referrer\" content=\"no-referrer\">"
+        "<title>Oma Year Planner</title>"
+        "<script>location.replace(" + script + ");</script>\n"
+    )
+    path = os.path.join(os.path.dirname(token_path()), name)
+    write_private(path, page)
+    sys.stdout.write(path + "\n")
     return 0
+
+
+def sweep_launchers():
+    folder = os.path.dirname(token_path())
+    now = time.time()
+    for name, ttl in LAUNCHERS.items():
+        path = os.path.join(folder, name)
+        try:
+            if now - os.stat(path).st_mtime >= ttl:
+                os.unlink(path)
+        except OSError:
+            pass
+
+
+def sweeper():
+    while True:
+        sweep_launchers()
+        time.sleep(2)
 
 
 def main():
     global TOKEN
-    if sys.argv[1:] == ["ensure"]:
-        return ensure()
+    args = sys.argv[1:]
+    if args == ["ensure"]:
+        return 0 if ensure() else 1
+    if args[:1] == ["launch"] and args[1:] in ([], ["served"]):
+        return launch(args[1] if len(args) > 1 else "file")
+    if args:
+        sys.stderr.write("usage: bridge [ensure | launch [served]]\n")
+        return 2
     try:
         server = ThreadingHTTPServer((HOST, PORT), Handler)
     except OSError:
         # Already running.
         return 0
     TOKEN = load_or_create_token()
+    threading.Thread(target=sweeper, daemon=True).start()
     server.serve_forever()
     return 0
 

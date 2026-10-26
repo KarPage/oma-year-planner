@@ -3,8 +3,10 @@
 # Opening index.html as a file cannot install the offline app.
 cd "$(dirname "$0")" || exit 1
 ROOT=$(pwd)
-if TOKEN=$("$ROOT/bridge" ensure 2>/dev/null); then
-  # Open this link once; the page keeps the token for that tab.
-  echo "Open http://localhost:8080/#bt=$TOKEN to use Pin to desktop."
+# The token is never printed. Opening the private launcher page hands it to
+# that tab; the page is deleted after ten minutes.
+if LAUNCHER=$("$ROOT/bridge" launch served 2>/dev/null) && [ -n "$LAUNCHER" ]; then
+  echo "To use Pin to desktop, open file://$LAUNCHER in Chromium (one tab, within 10 minutes)."
 fi
-exec python3 -m http.server 8080
+echo "Planner: http://localhost:8080"
+exec python3 -m http.server 8080 --bind 127.0.0.1

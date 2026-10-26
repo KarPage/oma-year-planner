@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Check that the pin helper refuses every request without its token.
+"""Check that the pin helper refuses every request without its token,
+and that the token never shows up on a command line or in output.
 
 Runs a private copy of ./bridge on a spare port with a fake wallpaper script
 and a temporary runtime folder, so the real desktop is never touched.
@@ -33,6 +34,77 @@ def call(port, method, path, headers):
     return res.status, body
 
 
+def argv_leaks(token):
+    """No process on the machine may carry the token on its command line."""
+    leaks = []
+    for pid in os.listdir("/proc"):
+        if not pid.isdigit():
+            continue
+        try:
+            with open("/proc/%s/cmdline" % pid, "rb") as fh:
+                if token.encode() in fh.read():
+                    leaks.append("token found in argv of pid " + pid)
+        except OSError:
+            pass
+    return leaks
+
+
+def check_launcher(env, folder, token):
+    failures = []
+    out = subprocess.run([sys.executable, os.path.join(ROOT, "bridge"), "launch"],
+                         env=env, capture_output=True, text=True, timeout=10)
+    page = out.stdout.strip()
+    if out.returncode != 0 or page != os.path.join(folder, "index.html"):
+        return ["launch did not print the launcher path: %r" % out.stdout]
+    if token in out.stdout or token in out.stderr:
+        failures.append("launch printed the token")
+    if stat.S_IMODE(os.stat(page).st_mode) != 0o600:
+        failures.append("launcher page is not mode 0600")
+    body = open(page).read()
+    want = "index.html#bt=" + token
+    if want not in body or "location.replace(" not in body:
+        failures.append("launcher page does not forward to the planner with the token")
+    served = subprocess.run([sys.executable, os.path.join(ROOT, "bridge"), "launch", "served"],
+                            env=env, capture_output=True, text=True, timeout=10)
+    spage = served.stdout.strip()
+    if served.returncode != 0 or not spage.endswith("served.html"):
+        failures.append("launch served failed")
+    else:
+        if stat.S_IMODE(os.stat(spage).st_mode) != 0o600:
+            failures.append("served launcher is not mode 0600")
+        if "http://localhost:8080/#bt=" + token not in open(spage).read():
+            failures.append("served launcher does not forward to localhost:8080")
+        os.unlink(spage)
+    return failures
+
+
+def check_open(env, tmp, folder, token):
+    """Run ./open with a fake chromium and check what it was given."""
+    failures = []
+    stubs = os.path.join(tmp, "bin")
+    os.mkdir(stubs)
+    argv_log = os.path.join(tmp, "chromium-argv")
+    with open(os.path.join(stubs, "chromium"), "w") as fh:
+        fh.write('#!/bin/sh\nprintf "%%s\\n" "$@" > "%s"\n' % argv_log)
+    with open(os.path.join(stubs, "hyprctl"), "w") as fh:
+        fh.write("#!/bin/sh\nexit 1\n")
+    for name in ("chromium", "hyprctl"):
+        os.chmod(os.path.join(stubs, name), 0o755)
+    run_env = dict(env, PATH=stubs + os.pathsep + env.get("PATH", ""))
+    out = subprocess.run([os.path.join(ROOT, "open")], env=run_env,
+                         capture_output=True, text=True, timeout=30)
+    if out.returncode != 0 or not os.path.exists(argv_log):
+        return ["open did not start chromium: %s" % out.stderr.strip()]
+    args = open(argv_log).read()
+    if token in args:
+        failures.append("open put the token on chromium's command line")
+    if "--app=file://" + os.path.join(folder, "index.html") not in args:
+        failures.append("open did not hand chromium the launcher page: %r" % args)
+    if token in out.stdout or token in out.stderr:
+        failures.append("open printed the token")
+    return failures
+
+
 def main():
     failures = []
     with tempfile.TemporaryDirectory() as tmp:
@@ -43,17 +115,27 @@ def main():
             fh.write('#!/bin/sh\necho "$1" >> "%s"\n[ "$1" = status ] && echo unpinned\nexit 0\n' % log)
         os.chmod(fake, 0o755)
         port = free_port()
-        env = dict(os.environ, XDG_RUNTIME_DIR=tmp, OMA_YEAR_BRIDGE_PORT=str(port), OMA_YEAR_WALLPAPER=fake)
+        env = dict(os.environ, XDG_RUNTIME_DIR=tmp, OMA_YEAR_BRIDGE_PORT=str(port),
+                   OMA_YEAR_WALLPAPER=fake, OMA_YEAR_LAUNCH_TTL="1")
         out = subprocess.run([sys.executable, os.path.join(ROOT, "bridge"), "ensure"],
                              env=env, capture_output=True, text=True, timeout=10)
-        token = out.stdout.strip()
+        folder = os.path.join(tmp, "oma-year-planner")
+        path = os.path.join(folder, "bridge-token")
+        token = open(path).read().strip() if os.path.exists(path) else ""
         try:
             if out.returncode != 0 or len(token) != 64:
                 print("bridge did not start", out.stderr, file=sys.stderr)
                 return 1
-            path = os.path.join(tmp, "oma-year-planner", "bridge-token")
+            if out.stdout.strip():
+                failures.append("ensure printed something")
             if stat.S_IMODE(os.stat(path).st_mode) != 0o600:
                 failures.append("token file is not mode 0600")
+            if stat.S_IMODE(os.stat(folder).st_mode) != 0o700:
+                failures.append("token folder is not mode 0700")
+            failures.extend(check_launcher(env, folder, token))
+            failures.extend(check_open(env, tmp, folder, token))
+            if os.path.exists(log):
+                os.unlink(log)  # ./open runs "wallpaper refresh" when chromium exits.
             host = "127.0.0.1:%d" % port
 
             def expect(code, method, route, headers, label):
@@ -78,6 +160,17 @@ def main():
             if "toggle" not in calls:
                 failures.append("toggle with token did not run wallpaper")
             expect(204, "OPTIONS", "/toggle", {"Host": host, "Origin": "null"}, "preflight")
+            failures.extend(argv_leaks(token))
+            # The helper deletes launcher pages after OMA_YEAR_LAUNCH_TTL (1s here).
+            launcher = os.path.join(folder, "index.html")
+            subprocess.run([sys.executable, os.path.join(ROOT, "bridge"), "launch"],
+                           env=env, capture_output=True, timeout=10)
+            for _ in range(40):
+                if not os.path.exists(launcher):
+                    break
+                time.sleep(0.1)
+            else:
+                failures.append("launcher page was not deleted after its TTL")
         finally:
             for line in subprocess.run(["ss", "-Hltnp", "sport = :%d" % port], capture_output=True, text=True).stdout.splitlines():
                 if "pid=" in line:
@@ -87,7 +180,7 @@ def main():
         for f in failures:
             print(f, file=sys.stderr)
         return 1
-    print("bridge token check ok")
+    print("bridge token and launcher check ok")
     return 0
 
 

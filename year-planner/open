@@ -3,11 +3,12 @@
 # as its own window. An open planner is focused instead of opened twice.
 cd "$(dirname "$0")" || exit 1
 ROOT=$(pwd)
+WALL=${OMA_YEAR_WALLPAPER:-$ROOT/wallpaper}
 
 # file:// pages cannot run wallpaper themselves. The helper listens on
-# 127.0.0.1 only and needs a secret token, which the page gets in the URL
-# fragment. Without it the planner still works; only Pin to desktop is off.
-TOKEN=$("$ROOT/bridge" ensure 2>/dev/null) || TOKEN=""
+# 127.0.0.1 only and needs a secret token. It starts here so an open planner
+# keeps working if the helper was stopped.
+"$ROOT/bridge" ensure >/dev/null 2>&1 || true
 
 if command -v hyprctl >/dev/null 2>&1; then
   if hyprctl eval '
@@ -27,9 +28,15 @@ if command -v hyprctl >/dev/null 2>&1; then
 fi
 
 python3 ./apply-theme.py
+# The token never goes on a command line. ./bridge launch writes a private
+# page (mode 0600, in the user's 0700 runtime folder) that forwards to the
+# planner with the token in the URL fragment; Chromium gets only its path.
+# Without it the planner still works; only Pin to desktop is off.
 URL="file://$ROOT/index.html"
-[ -n "$TOKEN" ] && URL="$URL#bt=$TOKEN"
+if LAUNCHER=$("$ROOT/bridge" launch 2>/dev/null) && [ -n "$LAUNCHER" ]; then
+  URL="file://$LAUNCHER"
+fi
 chromium --app="$URL"
 code=$?
-"$ROOT/wallpaper" refresh >/dev/null 2>&1 || true
+"$WALL" refresh >/dev/null 2>&1 || true
 exit "$code"
