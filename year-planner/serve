@@ -1,0 +1,5 @@
+#!/bin/sh
+# Serve the planner so the service worker can register.
+# Opening index.html as a file cannot install the offline app.
+cd "$(dirname "$0")" || exit 1
+exec python3 -m http.server 8080

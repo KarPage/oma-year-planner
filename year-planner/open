@@ -1,0 +1,6 @@
+#!/bin/sh
+# Refresh colors from the active Omarchy theme, then open the year planner
+# as its own window.
+cd "$(dirname "$0")" || exit 1
+python3 ./apply-theme.py
+exec chromium --app="file://$(pwd)/index.html"

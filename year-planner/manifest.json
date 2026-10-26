@@ -1,0 +1,19 @@
+{
+  "name": "Year planner",
+  "short_name": "Planner",
+  "description": "A scrolling year board for plans and trips.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "version": "1.0.0",
+  "display": "standalone",
+  "background_color": "#000d04",
+  "theme_color": "#000d04",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
