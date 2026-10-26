@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "io.github.karpage.oma-year",
   "name": "Oma Year Planner",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "author": "KarPage",
   "license": "MIT",
   "description": "Your whole year on one screen. A local-first year calendar that follows your Omarchy theme. No backend, no account, no build step.",

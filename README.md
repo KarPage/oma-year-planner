@@ -10,16 +10,17 @@
 
 ## Features
 
-- **Whole year at a glance.** Months run down one scrolling board, with the day numbers pinned at the top. "Rolling 12" starts at the current month.
+- **Whole year at a glance.** Months run down one scrolling board. The day header stays pinned while the months scroll. "Rolling 12" starts at the current month, and **Today** brings the current month back to the middle.
+- **Past fades back.** Past months and finished plans dim, so what is ahead stands out.
 - **Fast planning.** Drag across days to add a plan, drag a bar to move it, or drag its ends to resize it.
 - **Trips, events and reminders.** One-day plans show as small markers. Trips add up to a "days away" count per month and for the year.
-- **Dashboard strip.** Shows the next and last plan, this month, what's coming up, and how many days you've been away.
+- **Dashboard strip.** Counts for plans, trips and days away, then Next, Up next and Last. A wide window shows three Upcoming plans. A narrow window keeps Next, Up next and Last on one line.
 - **Notes, links, checklists and up to four images per plan.** Checklist progress shows on the bar, for example `Canada · 8d · 3/7`.
 - **Search** with `/`, **undo** with `Ctrl+Z`, and full keyboard navigation (press `?`).
 - **Backup and calendar files.** Export and import JSON backups, with or without images, and `.ics` calendar files.
 - **Matches your Omarchy theme.** The planner reads the colors from your active theme each time it opens.
 - **Bar button.** Left-click opens the planner. Right-click pins the board on the wallpaper, or puts your wallpaper back.
-- **Wallpaper mode.** A still picture of your year, laid over your wallpaper and painted again at midnight.
+- **Pin to desktop.** A still picture of your year, laid over your wallpaper and painted again at midnight. Pin or unpin it with the **Pin to desktop** button in the header, the `W` key, a right-click on the bar button, or an optional `Super+Shift+Y` shortcut. Nothing on the picture clicks or moves.
 - **Google Calendar, if you want it.** Optional and read-only. It is off by default. You bring your own Google OAuth client id and run `./serve`. See [year-planner/README.md](year-planner/README.md#google-calendar).
 
 ## Privacy
@@ -31,6 +32,7 @@ Everything stays on your machine.
 - The page makes no network requests unless you connect Google Calendar. Then events come straight from Google to your browser, read-only. Nothing is sent back.
 - Data leaves your device only when you export a file yourself.
 - Wallpaper mode copies Chromium's local storage into a temporary folder so the picture can show your plans. It takes the picture there and deletes the copy.
+- `./open` starts a small helper so the **Pin to desktop** button can work from a local file. It listens only on `127.0.0.1:47321` and accepts only pin, unpin, toggle and status. It keeps running until you log out.
 
 ## Install as an Omarchy plugin
 
@@ -40,7 +42,7 @@ omarchy plugin add https://github.com/KarPage/oma-year-planner --enable
 
 This adds a calendar button to your bar. Left-click opens the planner in its own app window, themed with your current Omarchy colors. Right-click pins the board onto the wallpaper, or restores your wallpaper. If the button doesn't show up, add **Oma Year Planner** to the bar from the bar settings.
 
-You need Chromium (it ships with Omarchy), Python 3 for the theme sync, and ImageMagick (`magick`) for wallpaper mode.
+You need Chromium (it ships with Omarchy), Python 3 for the theme sync and the pin helper, `curl`, and ImageMagick (`magick`) for wallpaper mode.
 
 ### Remove the plugin
 
@@ -56,7 +58,10 @@ If you ever used wallpaper mode, remove its timer and saved state too:
 systemctl --user disable --now oma-year-wallpaper.timer
 rm -f ~/.config/systemd/user/oma-year-wallpaper.service ~/.config/systemd/user/oma-year-wallpaper.timer
 rm -rf ~/.local/state/oma-year
+pkill -f year-planner/bridge
 ```
+
+If you added the `Super+Shift+Y` shortcut, delete that line from `~/.config/hypr/yearplanner.lua`.
 
 Your plans are saved in Chromium, not in the plugin folder, so removing the plugin doesn't delete them. Export a backup first (**Export backup** in the footer) if you want a copy. To clear them, clear the planner's site data in Chromium.
 
@@ -84,7 +89,9 @@ A still picture of the board, laid over the desktop. Nothing on it clicks or mov
 
 Right-click the bar button to toggle it. While it is pinned, the picture is painted again at midnight, and again when the planner window closes.
 
-Optional shortcut, so you can unpin when the planner is closed. Add it to `~/.config/hypr/yearplanner.lua` (the path is this plugin's `year-planner/wallpaper`):
+In the planner, the **Pin to desktop** button and the `W` key do the same thing.
+
+Optional Hyprland shortcut, so you can unpin when the planner is closed. This is a step you add yourself; the plugin does not change your Hyprland config. Add it to `~/.config/hypr/yearplanner.lua` (or wherever you keep binds), with the path to this plugin's `year-planner/wallpaper`. When installed as a plugin, that is `~/.config/omarchy/plugins/io.github.karpage.oma-year/year-planner/wallpaper`:
 
 ```lua
 o.bind("SUPER + SHIFT + Y", "Pin or unpin the year planner", "/path/to/year-planner/wallpaper toggle")
@@ -125,6 +132,7 @@ oma-year-planner/
     ├── branding/     # icon.svg, icon-512.png, lockup.svg, lockup.png
     ├── open          # theme sync + app window launcher
     ├── wallpaper     # pin the board on the desktop
+    ├── bridge        # 127.0.0.1-only helper for the Pin to desktop button
     └── serve         # local server for the offline app
 ```
 
