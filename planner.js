@@ -70,13 +70,39 @@ var Planner = (function () {
     return MONTHS[p.m - 1] + " " + p.d;
   }
 
+  /* "1 plan", "0 plans", "2 matches". Zero and anything but 1 use the plural. */
+  function plural(n, singular, pluralForm) {
+    var word = n === 1 ? singular : (pluralForm || singular + "s");
+    return n + " " + word;
+  }
+
   function rangeCountLabel(from, to) {
     if (!parse(from) || !parse(to)) return "";
     var start = from <= to ? from : to;
     var end = from <= to ? to : from;
     var days = inclusiveDays(start, end);
     var when = start === end ? prettyDate(start) : prettyDate(start) + " – " + prettyDate(end);
-    return when + " · " + days + (days === 1 ? " day" : " days");
+    return when + " · " + plural(days, "day");
+  }
+
+  /* Keep the day count only while the name is not already truncated.
+     A zero client width means layout has not run yet. */
+  function barKeepsDayCount(nameScroll, nameClient) {
+    if (!(nameClient > 0)) return true;
+    return nameScroll <= nameClient + 1;
+  }
+
+  function importStatus(mode, added, importedCount, identical, skipped, singular) {
+    var one = singular || "plan";
+    var parts = [];
+    if (mode === "merge") {
+      parts.push("Merged " + plural(added, one));
+      if (identical) parts.push("skipped " + plural(identical, "identical " + one));
+    } else {
+      parts.push("Imported " + plural(importedCount, one));
+    }
+    if (skipped) parts.push("skipped " + plural(skipped, "unreadable " + one));
+    return parts.join(", ") + ".";
   }
 
   function rollingRange(today, plans) {
@@ -617,6 +643,32 @@ var Planner = (function () {
     if (mixed.lanes["2026-05"] !== 1) errors.push("single lane " + mixed.lanes["2026-05"]);
     if (mixed.bars.length !== 1 || mixed.bars[0].planId !== "span") errors.push("single excluded from bars");
     if (!mixed.singles || mixed.singles.length !== 2) errors.push("singles missing");
+    if (plural(0, "plan") !== "0 plans") errors.push("plural zero");
+    if (plural(1, "plan") !== "1 plan") errors.push("plural one");
+    if (plural(2, "plan") !== "2 plans") errors.push("plural many");
+    if (plural(1, "match", "matches") !== "1 match") errors.push("plural irregular one");
+    if (plural(2, "match", "matches") !== "2 matches") errors.push("plural irregular many");
+    if (plural(1, "identical plan") !== "1 identical plan") errors.push("plural phrase one");
+    if (plural(2, "identical plan") !== "2 identical plans") errors.push("plural phrase many");
+    if (importStatus("merge", 1, 1, 0, 0, "plan") !== "Merged 1 plan.") errors.push("merged one");
+    if (importStatus("merge", 0, 2, 0, 0, "plan") !== "Merged 0 plans.") errors.push("merged zero");
+    if (importStatus("merge", 2, 3, 1, 0, "plan") !== "Merged 2 plans, skipped 1 identical plan.") {
+      errors.push("merged identical " + importStatus("merge", 2, 3, 1, 0, "plan"));
+    }
+    if (importStatus("merge", 0, 2, 2, 0, "plan") !== "Merged 0 plans, skipped 2 identical plans.") {
+      errors.push("merged identical many");
+    }
+    if (importStatus("replace", 0, 1, 0, 0, "event") !== "Imported 1 event.") errors.push("imported one");
+    if (importStatus("replace", 0, 2, 0, 1, "event") !== "Imported 2 events, skipped 1 unreadable event.") {
+      errors.push("imported unreadable");
+    }
+    if (importStatus("merge", 4, 5, 1, 2, "plan") !== "Merged 4 plans, skipped 1 identical plan, skipped 2 unreadable plans.") {
+      errors.push("merged both skips");
+    }
+    if (!barKeepsDayCount(80, 80)) errors.push("bar count fits");
+    if (!barKeepsDayCount(81, 80)) errors.push("bar count tolerance");
+    if (barKeepsDayCount(90, 40)) errors.push("bar count drop");
+    if (!barKeepsDayCount(40, 0)) errors.push("bar count unmeasured");
     return errors;
   }
 
@@ -632,6 +684,9 @@ var Planner = (function () {
     diffDays: diffDays,
     inclusiveDays: inclusiveDays,
     prettyDate: prettyDate,
+    plural: plural,
+    barKeepsDayCount: barKeepsDayCount,
+    importStatus: importStatus,
     rangeCountLabel: rangeCountLabel,
     rollingRange: rollingRange,
     plansOutsideRange: plansOutsideRange,

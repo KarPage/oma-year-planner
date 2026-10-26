@@ -438,8 +438,8 @@
   }
 
   function dayPhrase(n, soon) {
-    var word = n === 1 ? "day" : "days";
-    return soon ? "in " + n + " " + word : n + " " + word + " ago";
+    var phrase = Planner.plural(n, "day");
+    return soon ? "in " + phrase : phrase + " ago";
   }
 
   function dashEvent(which, plan, days, soon) {
@@ -534,16 +534,14 @@
       });
     }
     var span = RANGE_START + "–" + RANGE_END;
-    var noun = outside.length === 1 ? "plan" : "plans";
     note.hidden = false;
     if (q && matched.length) {
       var names = matched.slice(0, 3).map(function (plan) { return plan.title; }).join(", ");
       var extra = matched.length > 3 ? " +" + (matched.length - 3) : "";
-      var matchNoun = matched.length === 1 ? "match" : "matches";
-      note.textContent = matched.length + " " + matchNoun + " outside " + span + ": " + names + extra;
+      note.textContent = Planner.plural(matched.length, "match", "matches") + " outside " + span + ": " + names + extra;
       return;
     }
-    note.textContent = outside.length + " " + noun + " outside " + span;
+    note.textContent = Planner.plural(outside.length, "plan") + " outside " + span;
   }
 
   function cellDate(y, m, d) {
@@ -720,7 +718,9 @@
       el.style.setProperty("--lane", String(bar.lane));
       el.style.setProperty("--lanes", String(laid.lanes[ym] || 1));
       el.dataset.id = plan.id;
-      el.title = plan.title + " · " + bar.days + "d";
+      var tip = plan.title + " · " + Planner.plural(bar.days, "day");
+      el.title = tip;
+      el.setAttribute("aria-label", tip);
 
       var fill = document.createElement("span");
       fill.className = "fill";
@@ -762,6 +762,8 @@
       el.append(fill);
       calendar.append(el);
     });
+    fitBarLabels();
+    requestAnimationFrame(fitBarLabels);
     Object.keys(groups).forEach(function (iso) {
       var segs = groups[iso];
       var host = board.querySelector('.month[data-ym="' + iso.slice(0, 7) + '"]');
@@ -793,7 +795,7 @@
         more.style.gridColumn = String(segs[0].startDay + 1);
         more.style.gridRow = host.dataset.row;
         more.textContent = "+" + (segs.length - 3);
-        more.setAttribute("aria-label", (segs.length - 3) + " more plans");
+        more.setAttribute("aria-label", Planner.plural(segs.length - 3, "more plan"));
         calendar.append(more);
       }
     });
@@ -806,7 +808,18 @@
       var count = Planner.monthDaysAway(list, +parts[0], +parts[1]);
       node.textContent = String(count);
       node.classList.toggle("zero", count === 0);
-      node.title = count === 1 ? "1 day away" : count + " days away";
+      node.title = Planner.plural(count, "day") + " away";
+    });
+  }
+
+  /* Drop "·Nd" before the name truncates. Full title and days stay on the bar tooltip. */
+  function fitBarLabels() {
+    board.querySelectorAll(".bar:not(.single) .fill").forEach(function (fill) {
+      var label = fill.querySelector(".label");
+      var count = fill.querySelector(".count");
+      if (!label || !count) return;
+      count.classList.remove("is-dropped");
+      if (!Planner.barKeepsDayCount(label.scrollWidth, label.clientWidth)) count.classList.add("is-dropped");
     });
   }
 
@@ -1953,7 +1966,7 @@
     link.download = "year-planner.json";
     link.click();
     setTimeout(function () { URL.revokeObjectURL(url); }, 1500);
-    setStatus("Exported " + plans.length + " plans.");
+    setStatus("Exported " + Planner.plural(plans.length, "plan") + ".");
   });
 
   function newId(suffix) {
@@ -1984,16 +1997,16 @@
     return Planner.mergePlans(current, incoming, function () { return newId(0); });
   }
 
-  function askImport(count, noun) {
+  function askImport(count, singular) {
     var chooser = document.getElementById("import-mode");
     var text = document.getElementById("import-mode-text");
-    var label = noun || "plans";
+    var one = singular || "plan";
     if (!chooser || typeof chooser.showModal !== "function") {
-      if (window.confirm("Replace all current plans with the " + count + " imported " + label + "?")) return Promise.resolve("replace");
-      if (window.confirm("Merge the imported " + label + " into the current list?")) return Promise.resolve("merge");
+      if (window.confirm("Replace all current plans with " + Planner.plural(count, "imported " + one) + "?")) return Promise.resolve("replace");
+      if (window.confirm("Merge " + Planner.plural(count, "imported " + one) + " into the current list?")) return Promise.resolve("merge");
       return Promise.resolve("cancel");
     }
-    text.textContent = "This file has " + count + " " + label + ". Replace the current list, or merge them in?";
+    text.textContent = "This file has " + Planner.plural(count, one) + ". Replace the current list, or merge them in?";
     return new Promise(function (resolve) {
       function onClose() {
         chooser.removeEventListener("close", onClose);
@@ -2004,9 +2017,9 @@
     });
   }
 
-  function adoptPlans(next, skipped, noun) {
+  function adoptPlans(next, skipped, singular) {
     var unique = dedupeIds(next);
-    askImport(unique.length, noun).then(function (mode) {
+    askImport(unique.length, singular).then(function (mode) {
       if (mode !== "replace" && mode !== "merge") {
         setStatus("Import cancelled.");
         return;
@@ -2021,15 +2034,7 @@
         arm = null;
         hoverDate = null;
       }, function () {
-        var parts = [];
-        if (mode === "merge") {
-          parts.push("Merged " + (merged.length - beforeCount) + " " + noun);
-          if (identical) parts.push("skipped " + identical + " identical");
-        } else {
-          parts.push("Imported " + unique.length + " " + noun);
-        }
-        if (skipped) parts.push("skipped " + skipped + " unreadable");
-        setStatus(parts.join(", ") + ".");
+        setStatus(Planner.importStatus(mode, merged.length - beforeCount, unique.length, identical, skipped, singular));
       });
     });
   }
@@ -2072,7 +2077,7 @@
         setStatus("No plans found in that backup.");
         return;
       }
-      adoptPlans(next, skipped, "plans");
+      adoptPlans(next, skipped, "plan");
     });
   });
 
@@ -2379,7 +2384,7 @@
 
   document.getElementById("export-ics").addEventListener("click", function () {
     download("year-planner.ics", plansToIcs(plans), "text/calendar");
-    setStatus("Exported " + plans.length + " plans as a calendar.");
+    setStatus("Exported " + Planner.plural(plans.length, "plan") + " as a calendar.");
   });
   document.getElementById("import-ics").addEventListener("click", function () {
     document.getElementById("import-ics-file").click();
@@ -2392,7 +2397,7 @@
       var parsed = plansFromIcs(text);
       if (parsed.error) { setStatus(parsed.error); return; }
       if (!parsed.plans.length) { setStatus("No events found in that calendar."); return; }
-      adoptPlans(parsed.plans, parsed.skipped, "events");
+      adoptPlans(parsed.plans, parsed.skipped, "event");
     });
   });
 
@@ -2468,6 +2473,7 @@
       resizeTick = 0;
       applySnapPadding();
       fitMarquee();
+      fitBarLabels();
       if (boardDrag) return;
       var months = board.querySelectorAll(".month");
       if (!months.length) return;
@@ -2478,6 +2484,17 @@
   });
   if (window.matchMedia) {
     var motionQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
-    if (motionQuery.addEventListener) motionQuery.addEventListener("change", fitMarquee);
+    if (motionQuery.addEventListener) {
+      motionQuery.addEventListener("change", function () {
+        fitMarquee();
+        fitBarLabels();
+      });
+    }
+  }
+  if (document.fonts && document.fonts.ready) {
+    document.fonts.ready.then(function () {
+      fitBarLabels();
+      fitMarquee();
+    }).catch(function () {});
   }
 })();

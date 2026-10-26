@@ -221,6 +221,10 @@
     }
     .dash-rhythm:hover .dash-track.is-long,
     .dash-rhythm:focus-within .dash-track.is-long { animation-play-state: paused; }
+    .dash-rhythm:has(.dash-track.is-long) {
+      -webkit-mask-image: linear-gradient(to right, transparent, #000 2rem, #000 calc(100% - 2rem), transparent);
+      mask-image: linear-gradient(to right, transparent, #000 2rem, #000 calc(100% - 2rem), transparent);
+    }
     @keyframes dash-marquee {
       from { transform: translateX(0); }
       to { transform: translateX(-50%); }
@@ -583,6 +587,7 @@
       text-align: left;
     }
     .fill .count { flex: none; opacity: 0.85; }
+    .fill .count.is-dropped { display: none; }
     .fill .edge { flex: none; font-weight: 700; }
     .count-short { display: none; }
     .bar.cont-before .fill {
@@ -948,6 +953,32 @@
         padding: 0 14px;
         font-size: clamp(12px, 50cqh, 15px);
       }
+      .bar:not(.single) .fill:has(.handle.w) { padding-left: 16px; }
+      .bar:not(.single) .fill:has(.handle.e) { padding-right: 16px; }
+    }
+
+    @media (min-width: 1200px) {
+      .dash-track:not(.is-long) { width: 100%; }
+      .dash-track:not(.is-long) .dash-set {
+        flex: 1 1 auto;
+        width: 100%;
+        min-width: 0;
+        gap: 24px;
+      }
+      .dash-track:not(.is-long) .dash-event {
+        flex: 1 1 0;
+        min-width: min-content;
+        max-width: 100%;
+      }
+      .dash-track:not(.is-long) .dash-event .name {
+        flex: 0 1 auto;
+        min-width: auto;
+      }
+      .dash-track:not(.is-long) .dash-set:has(.dash-event[data-which="next"]):has(.dash-event[data-which="last"]) .dash-event[data-which="last"] {
+        justify-content: flex-end;
+      }
+      .dash-event .k,
+      .dash-event .unit { font-size: 11px; }
     }
 
     @media (max-width: 1000px) {
@@ -1002,7 +1033,11 @@
         line-height: 1;
         font-weight: 650;
       }
-      .bar:not(.single) .fill { padding: 0 14px; font-size: clamp(8px, 42cqh, 11px); }
+      .bar:not(.single) .fill { padding: 0 4px; font-size: clamp(8px, 42cqh, 11px); }
+      .bar:not(.single) .handle { opacity: 0; pointer-events: none; }
+      .bar:not(.single):is(:hover, :focus-within, .selected) .handle { opacity: 1; pointer-events: auto; }
+      .bar:not(.single):is(:hover, :focus-within, .selected) .fill:has(.handle.w) { padding-left: 12px; }
+      .bar:not(.single):is(:hover, :focus-within, .selected) .fill:has(.handle.e) { padding-right: 12px; }
       .count-full { display: none; }
       .count-short { display: inline; }
       .foot { flex-wrap: wrap; gap: 6px; }
@@ -1010,14 +1045,65 @@
       .backup button { font-size: 12px; }
     }
 
-    .bar:not(.single) .fill:has(.handle.w) { padding-left: 16px; }
-    .bar:not(.single) .fill:has(.handle.e) { padding-right: 16px; }
+    /* Short bars keep the label inset only enough for a hidden handle. */
+    @container (max-width: 220px) {
+      .bar:not(.single) .fill,
+      .bar:not(.single) .fill:has(.handle.w),
+      .bar:not(.single) .fill:has(.handle.e) {
+        padding-left: 4px;
+        padding-right: 4px;
+      }
+      .bar:not(.single) .handle { opacity: 0; pointer-events: none; }
+      .bar:not(.single):is(:hover, :focus-within, .selected) .handle { opacity: 1; pointer-events: auto; }
+      .bar:not(.single):is(:hover, :focus-within, .selected) .fill:has(.handle.w) { padding-left: 12px; }
+      .bar:not(.single):is(:hover, :focus-within, .selected) .fill:has(.handle.e) { padding-right: 12px; }
+    }
     @media (prefers-reduced-motion: reduce) {
       .dash-track,
       .dash-track.is-long { animation: none; transform: none; }
       .dash-rhythm { overflow: hidden; }
-      .dash-set { flex-wrap: wrap; min-width: 0; }
-      .dash-track { width: 100%; min-width: 0; }
+      .dash-track { width: 100%; min-width: 0; max-width: 100%; }
+      .dash-set {
+        flex: 1 1 auto;
+        flex-wrap: wrap;
+        width: 100%;
+        max-width: 100%;
+        min-width: 0;
+      }
+      .dash-event {
+        min-width: 0;
+        max-width: 100%;
+        overflow: hidden;
+      }
+      .dash-event .name,
+      .dash-event .k,
+      .dash-event .unit,
+      .dash-event .num {
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+    }
+    @media (prefers-reduced-motion: reduce) and (max-width: 1000px) {
+      .dash-set { row-gap: 2px; }
+      .dash-event {
+        flex: 1 1 100%;
+        flex-wrap: wrap;
+        align-items: baseline;
+        min-width: 0;
+        max-width: 100%;
+        overflow: hidden;
+      }
+    }
+    @media (min-width: 1200px) and (prefers-reduced-motion: reduce) {
+      .dash-track:not(.is-long) .dash-event { min-width: 0; overflow: hidden; }
+      .dash-track:not(.is-long) .dash-event .name {
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
     }
   </style>
   <link rel="stylesheet" href="theme.css">
