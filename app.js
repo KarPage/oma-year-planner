@@ -70,8 +70,8 @@ function paintPin(pinned) {
   label.textContent = pinned ? "Unpin" : "Pin to desktop";
   button.setAttribute("aria-pressed", pinned ? "true" : "false");
   button.title = pinned
-    ? "Take the board off the desktop"
-    : "Pin the year board to the desktop wallpaper";
+    ? "Unpin from desktop: put your wallpaper back"
+    : "Pin to desktop: show the year board as your wallpaper";
 }
 
 function togglePin() {
@@ -134,12 +134,22 @@ document.getElementById("full-btn").addEventListener("click", toggleFullscreen);
 document.addEventListener("fullscreenchange", paintFullscreen);
 window.addEventListener("resize", paintFullscreen);
 paintFullscreen();
-fetch(PIN_BRIDGE + "/status").then(function (res) {
-  if (!res.ok) throw new Error("status");
-  return res.json();
-}).then(function (data) {
-  paintPin(!!data.pinned);
-}).catch(function () {});
+// The board can be pinned or unpinned outside the page too: from the bar,
+// the key bind, or the midnight timer. Ask the helper again whenever the page
+// comes back into view, and every 12 seconds while it is visible.
+function checkPin() {
+  if (pinBusy || document.hidden) return;
+  fetch(PIN_BRIDGE + "/status").then(function (res) {
+    if (!res.ok) throw new Error("status");
+    return res.json();
+  }).then(function (data) {
+    if (!pinBusy) paintPin(!!data.pinned);
+  }).catch(function () {});
+}
+checkPin();
+window.addEventListener("focus", checkPin);
+document.addEventListener("visibilitychange", checkPin);
+setInterval(checkPin, 12000);
 document.getElementById("help-keys-btn").addEventListener("click", function () {
   var boardKeys = document.getElementById("key-board");
   var open = boardKeys.hidden;
