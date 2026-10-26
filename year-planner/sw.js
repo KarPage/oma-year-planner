@@ -14,6 +14,7 @@ var FILES = [
   "./editor.js",
   "./app.js",
   "./theme.css",
+  "./theme-defaults.css",
   "./manifest.json",
   "./icon.svg"
 ];
