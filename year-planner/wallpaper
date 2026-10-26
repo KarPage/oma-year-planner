@@ -8,10 +8,17 @@ STATE=${XDG_STATE_HOME:-$HOME/.local/state}/oma-year
 BG_LINK=$HOME/.local/state/omarchy/current/background
 ORIGINAL=$STATE/original-bg
 CURRENT=$STATE/current
+# Rewritten on every pin, unpin, or refresh. The bar watches it.
+CHANGED=$STATE/changed
 
 mkdir -p "$STATE"
 exec 9>"$STATE/lock"
 flock -w 90 9
+[ -e "$CHANGED" ] || : > "$CHANGED"
+
+mark_changed() {
+  date +%s%N > "$CHANGED"
+}
 
 die() {
   echo "wallpaper: $*" >&2
@@ -192,6 +199,7 @@ PY
   printf '%s\n' "$out" > "$CURRENT"
   find "$STATE" -maxdepth 1 -type f -name 'render-*.png' ! -name "render-$stamp.png" -delete
   omarchy-theme-bg-set "$out" >/dev/null
+  mark_changed
   echo "pinned $out"
 }
 
@@ -221,11 +229,13 @@ cmd_unpin() {
     [ -f "$wall" ] || die "saved wallpaper is missing: $wall"
     omarchy-theme-bg-set "$wall" >/dev/null
     clear_state
+    mark_changed
     echo "restored $wall"
     # Close the lock first so Chromium does not keep holding it.
     exec "$ROOT/open" 9>&-
   fi
   clear_state
+  mark_changed
   echo "unpinned"
 }
 

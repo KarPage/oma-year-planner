@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.1.4
+
+- Pin to desktop follows the real state. The page asks the desktop helper again when it comes back into view and every 12 seconds while visible, so unpinning from the bar, the key bind, or the timer shows up right away.
+- The bar icon updates the moment the board is pinned, unpinned, or refreshed from anywhere.
+- Pin to desktop is now the last button in the top row, after the shortcuts button.
+
 ## 1.1.3
 
 - The desktop snapshot keeps clear of the top bar and the screen edges. It reads the space the bar reserves on each monitor (32 pixels if that is unknown) and adds a small margin, so the date row is never hidden under the bar on any screen.
