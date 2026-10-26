@@ -71,11 +71,9 @@ function load() {
       return raw.plans.map(Planner.normalize).filter(Boolean);
     }
   } catch (err) {
-    /* fall through to the sample year */
+    /* a broken save starts empty rather than the sample year */
   }
-  return Planner.SAMPLE.map(function (plan) {
-    return Planner.makePlan(plan);
-  }).filter(Boolean);
+  return [];
 }
 
 var IMAGE_DB = "year-planner";

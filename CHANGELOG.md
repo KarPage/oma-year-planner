@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.1.0
+
+- Past plan titles stay readable. Narrow screens give Up next the room up to the search icon.
+- An empty board shows one hint: drag across days to add the first plan.
+
 ## Unreleased
 
 - The dashboard switches with the window: Up next on a narrow screen, three upcoming cells when wide. Past months and finished plans fade back.

@@ -34,10 +34,11 @@ body {
 button, input { font: inherit; color: inherit; accent-color: var(--accent); }
 ::selection { background: var(--accent); color: var(--bg); }
 button { cursor: pointer; }
-button:focus-visible, input:focus-visible {
+button:focus-visible, input:focus-visible, .bar:focus-visible .fill, .single-more:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
+.bar:focus-visible { outline: none; }
 
 .top {
   display: grid;
@@ -163,14 +164,15 @@ h1.today-headline {
   flex: 1 1 0;
   min-width: 0;
 }
-#rhythm .dash-group.is-next { flex: 1.6 1 0; }
-#rhythm .dash-group.is-up { flex: 1.15 1 0; }
+#rhythm .dash-group.is-next { flex: 1.15 1 0; }
 #rhythm .dash-group.is-soon { display: none; }
 #rhythm .dash-group.is-last {
-  flex: 0 1 auto;
-  margin-left: auto;
-  max-width: 18rem;
+  flex: 0 0 auto;
+  margin-left: 0;
+  max-width: 16rem;
 }
+#rhythm .dash-group.is-up { flex: 1.6 1 0; }
+.dash-event .name { flex: 1 1 auto; }
 .last-cell { display: none; }
 .last-line {
   flex-direction: row;
@@ -503,6 +505,19 @@ h1.today-headline {
   font-size: 12px;
 }
 .dash .search { margin-left: 8px; flex: none; }
+.empty-hint {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 46%;
+  margin: 0;
+  text-align: center;
+  color: var(--muted);
+  font-size: 14px;
+  pointer-events: none;
+  z-index: 6;
+}
+.board { position: relative; }
 .soon-row {
   display: flex;
   gap: 8px;
@@ -573,6 +588,17 @@ h1.today-headline {
   color: var(--muted);
   text-shadow: none;
   font-size: 14px;
+}
+@container strip (max-width: 1559px) {
+  label.search {
+    width: 36px;
+    padding: 0;
+    justify-content: center;
+    overflow: hidden;
+  }
+  label.search input { width: 0; min-width: 0; padding: 0; opacity: 0; }
+  label.search:focus-within { width: 180px; padding: 0 8px; }
+  label.search:focus-within input { width: 130px; opacity: 1; }
 }
 @container strip (min-width: 1560px) {
   #rhythm .dash-group.is-up { display: none; }
@@ -648,6 +674,17 @@ label.search input::-webkit-search-results-decoration {
   -webkit-appearance: none;
   appearance: none;
   display: none;
+}
+@container strip (max-width: 1559px) {
+  label.search {
+    width: 36px;
+    padding: 0;
+    justify-content: center;
+    overflow: hidden;
+  }
+  label.search input { width: 0; flex: 0 0 0; opacity: 0; }
+  label.search:focus-within { width: 180px; padding: 0 8px; }
+  label.search:focus-within input { width: 130px; flex: 1 1 auto; opacity: 1; }
 }
 label.search input::placeholder {
   color: var(--muted);
@@ -967,13 +1004,14 @@ label.search input::placeholder {
     color-mix(in srgb, var(--cat, var(--accent)) 42%, transparent) var(--progress, 0%),
     color-mix(in srgb, var(--cat, var(--accent)) 25%, transparent) var(--progress, 0%));
 }
-.bar.is-past .fill {
+.bar.is-past:not(.single):not(.is-brief) .fill {
   filter: grayscale(0.85);
-  opacity: 0.45;
+  opacity: 1;
+  color: color-mix(in srgb, var(--fg) 65%, var(--bg));
 }
 .bar.is-past .pill {
-  color: var(--muted);
-  border-color: color-mix(in srgb, var(--muted) 80%, transparent);
+  color: color-mix(in srgb, var(--fg) 65%, var(--bg));
+  border-color: color-mix(in srgb, var(--fg) 40%, var(--bg));
 }
 .bar.is-next:not(.is-brief):not(.single) .fill {
   outline: 1px solid var(--accent);
@@ -1040,9 +1078,9 @@ label.search input::placeholder {
     color-mix(in srgb, var(--cat, var(--accent)) 50%, transparent) var(--progress, 0%),
     color-mix(in srgb, var(--cat, var(--accent)) 35%, transparent) var(--progress, 0%));
 }
-.bar.is-past:hover .fill {
+.bar.is-past:not(.single):not(.is-brief):hover .fill {
   filter: grayscale(0.85);
-  opacity: 0.55;
+  opacity: 1;
 }
 .bar.selected .fill {
   outline: 2px solid color-mix(in srgb, var(--cat, var(--accent)) 82%, white);
@@ -1598,12 +1636,10 @@ textarea {
 .bar.single.is-gcal { cursor: default; }
 .bar.single .mark-label {
   display: none;
-  max-width: 7ch;
   overflow: hidden;
-  text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 9px;
-  font-weight: 700;
+  font-size: 11px;
+  font-weight: 600;
   line-height: 1;
   color: var(--fg);
   pointer-events: none;
@@ -1613,9 +1649,10 @@ textarea {
   transform: translateY(calc((var(--slot, 0) - 0.5) * 10px));
 }
 .bar.single.is-mini .mark-label { display: none; }
-@container daydot (min-width: 42px) {
+@container daydot (min-width: 46px) {
   .mark-label.mark-label.mark-label { display: block; }
 }
+.bar.single .mark-label.is-hidden { display: none; }
 .bar.single .g-mark { display: none; }
 .bar.single .fill {
   position: relative;
@@ -1896,10 +1933,16 @@ textarea {
   .dash-event .name { font-size: 13px; }
   .dash-event .num { font-size: 20px; }
   label.search {
-    width: 140px;
+    width: 36px;
     height: 32px;
     margin: 4px 8px;
+    padding: 0;
+    justify-content: center;
+    overflow: hidden;
   }
+  label.search input { width: 0; min-width: 0; padding: 0; opacity: 0; }
+  label.search:focus-within { width: 160px; padding: 0 8px; }
+  label.search:focus-within input { width: 110px; opacity: 1; }
   .board { --head: 20px; }
   .dayhead-bar,
   .calendar { grid-template-columns: 2.4rem repeat(31, minmax(0, 1fr)) 1.25rem; }
@@ -1908,8 +1951,22 @@ textarea {
   .month .name { font-size: 11px; letter-spacing: -0.03em; }
   .daynum { font-size: 9px; }
   .corner, .away-head { font-size: 0; }
-  .corner::after { content: "M"; font-size: 8px; }
-  .away-head::after { content: "A"; font-size: 8px; }
+  .corner::after {
+    content: "";
+    width: 11px;
+    height: 11px;
+    background:
+      linear-gradient(currentColor, currentColor) 0 0 / 4px 4px no-repeat,
+      linear-gradient(currentColor, currentColor) 7px 0 / 4px 4px no-repeat,
+      linear-gradient(currentColor, currentColor) 0 7px / 4px 4px no-repeat,
+      linear-gradient(currentColor, currentColor) 7px 7px / 4px 4px no-repeat;
+  }
+  .away-head::after {
+    content: "Σ";
+    font-size: 13px;
+    font-weight: 650;
+    line-height: 1;
+  }
   .month-total { font-size: 9px; }
   .wd { font-size: 8px; }
   .bar:not(.single):not(.is-brief) .fill { padding: 0 8px 0 12px; }

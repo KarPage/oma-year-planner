@@ -528,6 +528,7 @@ function render() {
   if (!board.querySelector(".calendar")) buildGrid();
   refreshToday();
   syncBars();
+  syncEmpty();
   syncTotals();
   syncTips();
   paintSelection();

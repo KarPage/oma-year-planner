@@ -4,7 +4,7 @@ A scrolling year board for plans and trips. It is one HTML page, a stylesheet, a
 
 Your data stays on your device. Plans are saved in this browser under `year-planner/v1`. Images are saved in IndexedDB, not in that plan list. Nothing is sent to a server unless you connect Google Calendar, which is optional and off by default.
 
-Screenshots for a release live in [screenshots/](screenshots/).
+Screenshots for a release live in [screenshots/](screenshots/). The wide shot shows the pinned day header, the Upcoming cells, and full-color plans ahead of today. The narrow shot shows Next, Up next, and Last on one line, with the search field collapsed to an icon.
 
 ## Features
 
@@ -15,7 +15,7 @@ Screenshots for a release live in [screenshots/](screenshots/).
 - Days away counts trips only. That number is on the dashboard, at the end of each month, and in the Away popover.
 - One-day plans are small markers. Click one to edit the name, color, or type. A checklist can show progress on the bar, such as `Canada · 8d · 3/7`.
 - Notes can contain links. Up to four images can be attached. They are shrunk before they are stored.
-- Search, undo, and a wide-screen strip for this month and the next three plans.
+- Search, undo, and a dashboard strip. A wide window shows the next three plans. A narrow window keeps Next and Up next on one line.
 - JSON backup, with or without images, and `.ics` import and export. A file over 20 MB is refused. Import can replace the list or merge into it.
 - Optional read-only Google Calendar connect. Events are copied into this browser. Local plans are never sent to Google.
 - Colors come from `theme.css`. On Omarchy, `./open` refreshes that file from the active theme.

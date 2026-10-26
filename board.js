@@ -341,7 +341,9 @@ function buildGrid() {
     return el;
   }
 
-  bar.append(head("corner", "Month", 1));
+  var monthHead = head("corner", "Month", 1);
+  monthHead.title = "Month";
+  bar.append(monthHead);
   for (var day = 1; day <= 31; day++) {
     var num = head("daynum", Planner.pad(day), day + 1);
     num.dataset.day = String(day);
@@ -492,7 +494,7 @@ function syncBars() {
     el.style.setProperty("--lanes", String(laid.lanes[ym] || 1));
     el.dataset.id = plan.id;
     var progress = Planner.checklistProgress(plan);
-    var tip = plan.title + " · " + bar.days + "d" + (progress ? " · " + progress.done + "/" + progress.total : "");
+    var tip = planAria(plan, bar.days + (bar.days === 1 ? " day" : " days") + (progress ? ", " + progress.done + " of " + progress.total : ""));
     el.title = tip;
     el.setAttribute("aria-label", tip);
 
@@ -551,7 +553,7 @@ function syncBars() {
       more.style.gridColumn = String(segs[0].startDay + 1);
       more.style.gridRow = host.dataset.row;
       more.textContent = String(segs.length);
-      more.setAttribute("aria-label", Planner.plural(segs.length, "plan"));
+      more.setAttribute("aria-label", Planner.plural(segs.length, "plan") + " on " + shortDate(iso));
       calendar.append(more);
       return;
     }
@@ -572,8 +574,9 @@ function syncBars() {
       tick.style.gridRow = host.dataset.row;
       tick.dataset.id = plan.id;
       tick.dataset.date = iso;
-      var oneTip = dotTip(plan);
+      var oneTip = planAria(plan);
       tick.setAttribute("aria-label", oneTip);
+      tick.title = oneTip;
       var mark = document.createElement("span");
       mark.className = "fill single";
       tick.append(mark);
@@ -608,11 +611,19 @@ function dotCaption(plan) {
   return word.slice(0, 7);
 }
 
-function dotTip(plan) {
-  var bits = [plan.title];
+function planAria(plan, extra) {
+  var when = plan.start === plan.end
+    ? shortDate(plan.start)
+    : shortDate(plan.start) + " to " + shortDate(plan.end);
+  var bits = [plan.title, when];
+  if (extra) bits.push(extra);
   if (plan.time) bits.push(plan.time);
   if (plan.location) bits.push(plan.location);
-  return bits.join(" · ");
+  return bits.join(", ");
+}
+
+function dotTip(plan) {
+  return planAria(plan);
 }
 
 function syncTotals() {
@@ -637,6 +648,28 @@ function fitBarLabels() {
     count.classList.remove("is-dropped");
     if (!Planner.barKeepsDayCount(label.scrollWidth, label.clientWidth)) count.classList.add("is-dropped");
   });
+  fitDotLabels();
+}
+
+/* Hide a day-dot label when the word does not fit beside the dot. */
+function fitDotLabels() {
+  board.querySelectorAll(".bar.single:not(.is-mini)").forEach(function (tick) {
+    var label = tick.querySelector(".mark-label");
+    if (!label) return;
+    label.classList.remove("is-hidden");
+    if (getComputedStyle(label).display === "none") return;
+    if (tick.scrollWidth > tick.clientWidth + 1) label.classList.add("is-hidden");
+  });
+}
+
+function syncEmpty() {
+  var old = board.querySelector(".empty-hint");
+  if (old) old.remove();
+  if (plans.length) return;
+  var hint = document.createElement("p");
+  hint.className = "empty-hint";
+  hint.textContent = "Drag across days to add your first plan";
+  board.append(hint);
 }
 
 function syncTips() {
