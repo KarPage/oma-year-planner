@@ -592,6 +592,7 @@ function applySnapPadding() {
 var scrollGen = 0;
 
 function scrollToMonth(y, m, smooth) {
+  board.classList.remove("today-view");
   var label = board.querySelector('.month[data-ym="' + y + "-" + Planner.pad(m) + '"]');
   if (!label) return;
   /* Ceil so a fractional row cannot leave the previous month above the header. */
@@ -600,7 +601,7 @@ function scrollToMonth(y, m, smooth) {
   var reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   var gen = ++scrollGen;
   if (!(smooth && !reduce) || Math.abs(board.scrollTop - top) < 2) {
-    board.scrollTo({ top: top, behavior: "auto" });
+    board.scrollTo({ top: top, behavior: "instant" });
     if (!boardDrag) board.classList.remove("panning");
     return;
   }
@@ -615,6 +616,43 @@ function scrollToMonth(y, m, smooth) {
   }
   board.addEventListener("scrollend", done);
   setTimeout(done, 900);
+}
+
+function centerOnToday(smooth) {
+  var today = todayParts();
+  var iso = cellDate(today.y, today.m, today.d);
+  var month = board.querySelector('.month[data-ym="' + today.y + "-" + Planner.pad(today.m) + '"]');
+  if (!month) return;
+  board.classList.add("today-view");
+  year = today.y;
+  if (yearLabel) yearLabel.textContent = String(today.y);
+  var boardRect = board.getBoundingClientRect();
+  var monthRect = month.getBoundingClientRect();
+  var head = headHeight();
+  var midY = boardRect.top + head + Math.max(0, boardRect.height - head) / 2;
+  var top = board.scrollTop + (monthRect.top + monthRect.height / 2 - midY);
+  var maxTop = Math.max(0, board.scrollHeight - board.clientHeight);
+  if (top < 0) top = 0;
+  if (top > maxTop) top = maxTop;
+  var left = board.scrollLeft;
+  var target = board.querySelector('.cell[data-date="' + iso + '"]');
+  if (!target) target = board.querySelector('.daynum[data-day="' + today.d + '"]');
+  if (target) {
+    var cellRect = target.getBoundingClientRect();
+    var away = board.querySelector(".away-head");
+    var awayW = away ? away.getBoundingClientRect().width : 0;
+    var midX = boardRect.left + monthRect.width + Math.max(0, boardRect.width - monthRect.width - awayW) / 2;
+    left = board.scrollLeft + (cellRect.left + cellRect.width / 2 - midX);
+    var maxLeft = Math.max(0, board.scrollWidth - board.clientWidth);
+    if (left < 0) left = 0;
+    if (left > maxLeft) left = maxLeft;
+  }
+  var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  board.scrollTo({
+    top: top,
+    left: left,
+    behavior: smooth && !reduce ? "smooth" : "instant"
+  });
 }
 
 function monthAtTopIndex() {
@@ -731,7 +769,11 @@ function endBoardDrag() {
 
 function updateViewYear() {
   var months = board.querySelectorAll(".month");
-  var edge = board.getBoundingClientRect().top + headHeight() + 4;
+  var rect = board.getBoundingClientRect();
+  var head = headHeight();
+  var edge = board.classList.contains("today-view")
+    ? rect.top + head + Math.max(0, rect.height - head) / 2
+    : rect.top + head + 4;
   var found = RANGE_START;
   for (var i = 0; i < months.length; i++) {
     if (months[i].getBoundingClientRect().bottom > edge) {

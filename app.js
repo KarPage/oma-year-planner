@@ -47,9 +47,6 @@ document.getElementById("help").addEventListener("close", function () {
   try { localStorage.setItem(WELCOME_KEY, "1"); } catch (err) { /* private mode */ }
 });
 
-document.getElementById("help-btn").addEventListener("click", function () {
-  openHelp("guide");
-});
 document.getElementById("keys-btn").addEventListener("click", function () {
   openHelp("shortcuts");
 });
@@ -181,7 +178,8 @@ function boot() {
   var m = today.m;
   if (y < RANGE_START) { y = RANGE_START; m = 1; }
   if (y > RANGE_END) { y = RANGE_END; m = 12; }
-  scrollToMonth(y, m, false);
+  if (y === today.y) centerOnToday(false);
+  else scrollToMonth(y, m, false);
   updateViewYear();
   armClock();
   var versionNode = document.getElementById("app-version");
@@ -202,6 +200,10 @@ window.addEventListener("resize", function () {
     fitMarquee();
     fitBarLabels();
     if (boardDrag) return;
+    if (board.classList.contains("today-view")) {
+      centerOnToday(false);
+      return;
+    }
     var months = board.querySelectorAll(".month");
     if (!months.length) return;
     var index = monthAtTopIndex();

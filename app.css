@@ -481,8 +481,7 @@ label.search input::placeholder {
   flex: 1;
   min-width: 0;
   min-height: 0;
-  overflow-x: hidden;
-  overflow-y: auto;
+  overflow: auto;
   container-type: size;
   scroll-padding-top: var(--head);
   scroll-snap-type: y mandatory;
@@ -491,10 +490,16 @@ label.search input::placeholder {
   border-bottom: 1px solid var(--line-strong);
   background: color-mix(in srgb, var(--bg-raised) 35%, var(--bg));
 }
-.board.panning {
+.board.panning,
+.board.today-view {
   scroll-snap-type: none;
+}
+.board.panning {
   scroll-behavior: auto;
   cursor: grabbing;
+}
+@media (prefers-reduced-motion: reduce) {
+  .board { scroll-behavior: auto; }
 }
 
 .calendar {
@@ -503,8 +508,11 @@ label.search input::placeholder {
   display: grid;
   grid-template-columns: 4.4rem repeat(31, minmax(0, 1fr)) 2.6rem;
   grid-auto-rows: auto;
+  box-sizing: content-box;
   width: 100%;
   min-width: 0;
+  /* Room on both sides so any day column can sit in the horizontal center. */
+  padding-inline: 50%;
   font-family: var(--mono);
   user-select: none;
 }
@@ -530,6 +538,15 @@ label.search input::placeholder {
   min-height: 0;
   /* Cover a subpixel seam so the previous month cannot peek past the snap. */
   box-shadow: 0 1px 0 color-mix(in srgb, var(--accent) 9%, var(--bg));
+}
+.corner {
+  position: sticky;
+  left: 0;
+  z-index: 12;
+}
+.month {
+  position: sticky;
+  left: 0;
 }
 .corner { color: var(--muted); font-size: 10px; font-weight: 500; }
 .daynum { color: var(--fg); font-size: 11px; font-weight: 600; }
@@ -596,11 +613,15 @@ label.search input::placeholder {
   pointer-events: none;
 }
 .away-head, .month-total {
+  position: sticky;
+  right: 0;
+  z-index: 8;
   font: inherit;
   border: 0;
   padding: 0;
   cursor: pointer;
 }
+.away-head { z-index: 12; top: 0; }
 .away-head:hover, .away-head:focus-visible,
 .month-total:hover, .month-total:focus-visible {
   background: color-mix(in srgb, var(--accent) 18%, var(--bg));
@@ -612,7 +633,7 @@ label.search input::placeholder {
   font-size: 11px;
   font-weight: 650;
   color: var(--accent);
-  background: transparent;
+  background: var(--bg);
   border-bottom: 1px solid color-mix(in srgb, var(--fg) 16%, transparent);
   border-left: 1px solid var(--line-strong);
 }
@@ -1108,7 +1129,16 @@ textarea {
   text-align: center;
 }
 .help-keys { border-top: 1px solid var(--line); padding-top: 8px; }
-.keys-toggle, #keys-btn { display: inline-flex; align-items: center; gap: 8px; }
+.keys-toggle { display: inline-flex; align-items: center; gap: 8px; }
+#keys-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  line-height: 0;
+  gap: 0;
+}
+#keys-btn svg { display: block; }
 .keys-toggle:hover, #keys-btn:hover, .keys-toggle:focus-visible, #keys-btn:focus-visible {
   border-color: var(--accent);
   color: var(--accent);

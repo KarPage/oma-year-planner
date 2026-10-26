@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Optional read-only Google Calendar connect. Events stay in this browser. Disconnect removes them.
+- Today centers the current month and day. The header keyboard button opens help.
 
 ## 1.0.0
 

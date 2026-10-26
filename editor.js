@@ -658,7 +658,7 @@ document.getElementById("today").addEventListener("click", function () {
   selectedId = null;
   paintSelection();
   paintFocus();
-  scrollToMonth(today.y, today.m, true);
+  centerOnToday(true);
 });
 
 var rollingBtn = document.getElementById("rolling");
