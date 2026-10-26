@@ -71,11 +71,9 @@ function load() {
       return raw.plans.map(Planner.normalize).filter(Boolean);
     }
   } catch (err) {
-    /* fall through to the sample year */
+    /* a broken save starts empty rather than the sample year */
   }
-  return Planner.SAMPLE.map(function (plan) {
-    return Planner.makePlan(plan);
-  }).filter(Boolean);
+  return [];
 }
 
 var IMAGE_DB = "year-planner";
@@ -567,6 +565,9 @@ document.addEventListener("keydown", function (event) {
   }
   if (event.key === "t" || event.key === "T") {
     document.getElementById("today").click();
+  } else if (event.key === "w" || event.key === "W") {
+    event.preventDefault();
+    if (typeof togglePin === "function") togglePin();
   } else if (event.key === "[") {
     scrollToMonth(Math.max(RANGE_START, year - 1), 1, true);
   } else if (event.key === "]") {

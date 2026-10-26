@@ -1,10 +1,22 @@
 # Changelog
 
+## 1.1.0
+
+- Past plan titles stay readable. Narrow screens give Up next the room up to the search icon.
+- An empty board shows one hint: drag across days to add the first plan.
+
 ## Unreleased
 
+- The dashboard switches with the window: Up next on a narrow screen, three upcoming cells when wide. Past months and finished plans fade back.
+- The day header stays pinned while the months scroll. The dashboard adds an Up next box beside Next.
+- Sharp terminal chrome. Next and Last are flat neon counts. One-day marks are dots with a short label.
+- The dashboard is four groups: counts, Next, Last, and a short Upcoming list.
+- Plan bars are glass. The editor palette is teal, sky, lavender, sand, rose, and mint.
+- Plan bars are solid, with a duration pill. One- and two-day plans are dots. The board scrollbar stays hidden.
 - Optional read-only Google Calendar connect. Events stay in this browser. Disconnect removes them.
 - Today centers the current month and day. The header keyboard button opens help.
 - The year grid stays within the window. Today centers the month vertically only.
+- Pin to desktop from the header, with W and Super+Shift+Y.
 - Wallpaper mode. Right-click the bar button to pin the board onto the wallpaper, and again to put your wallpaper back.
 
 ## 1.0.0

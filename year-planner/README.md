@@ -4,7 +4,7 @@ A scrolling year board for plans and trips. It is one HTML page, a stylesheet, a
 
 Your data stays on your device. Plans are saved in this browser under `year-planner/v1`. Images are saved in IndexedDB, not in that plan list. Nothing is sent to a server unless you connect Google Calendar, which is optional and off by default.
 
-Screenshots for a release live in [screenshots/](screenshots/).
+Screenshots for a release live in [screenshots/](screenshots/). The wide shot shows the pinned day header, the Upcoming cells, and full-color plans ahead of today. The narrow shot shows Next, Up next, and Last on one line, with the search field collapsed to an icon.
 
 ## Features
 
@@ -15,7 +15,7 @@ Screenshots for a release live in [screenshots/](screenshots/).
 - Days away counts trips only. That number is on the dashboard, at the end of each month, and in the Away popover.
 - One-day plans are small markers. Click one to edit the name, color, or type. A checklist can show progress on the bar, such as `Canada · 8d · 3/7`.
 - Notes can contain links. Up to four images can be attached. They are shrunk before they are stored.
-- Search, undo, and a wide-screen strip for this month and the next three plans.
+- Search, undo, and a dashboard strip. A wide window shows the next three plans. A narrow window keeps Next and Up next on one line.
 - JSON backup, with or without images, and `.ics` import and export. A file over 20 MB is refused. Import can replace the list or merge into it.
 - Optional read-only Google Calendar connect. Events are copied into this browser. Local plans are never sent to Google.
 - Colors come from `theme.css`. On Omarchy, `./open` refreshes that file from the active theme.
@@ -48,9 +48,13 @@ A still picture of the board, laid over the desktop. Nothing on it clicks or mov
 ./wallpaper status    say whether it is pinned
 ```
 
+In the planner, **Pin to desktop** does the same thing. Press `W`, or `Super+Shift+Y` from anywhere.
+
 Left-click the bar icon: `./open`. Right-click: `./wallpaper toggle`.
 
 While it is pinned, the picture is painted again at midnight, and again when the planner window closes.
+
+The page is a local file, so it cannot run the pin command itself. `./open` starts a helper that listens only on `127.0.0.1:47321`.
 
 It needs Chromium and ImageMagick (`magick`). Pinning saves your wallpaper path and the pictures in `~/.local/state/oma-year`, and adds a user timer, `~/.config/systemd/user/oma-year-wallpaper.{service,timer}`, for the midnight repaint. To draw your plans, it copies Chromium's local storage into a temporary folder, takes the picture there, and deletes the copy.
 
@@ -94,6 +98,8 @@ Calendar sync state (which calendars, the sync token, and the account address) i
 | Enter | Edit |
 | Esc | Close |
 | Ctrl+Z | Undo |
+| W | Pin or unpin the desktop |
+| Super+Shift+Y | Pin or unpin the desktop, even when the planner is closed |
 
 ## Privacy
 

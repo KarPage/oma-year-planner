@@ -45,57 +45,55 @@ function renderChrome() {
     item.append(strong, label);
     statsEl.append(item);
   });
-  renderDashExtra(list);
+}
+
+function shortDate(iso) {
+  var parts = Planner.parse(iso);
+  if (!parts) return iso;
+  return Planner.MONTHS[parts.m - 1].slice(0, 3) + " " + parts.d;
 }
 
 function renderDashExtra(list) {
   var host = document.getElementById("dash-extra");
   if (!host) return;
+  host.className = "dash-group dash-up";
   host.replaceChildren();
-  var today = todayParts();
-  var from = today.y + "-" + Planner.pad(today.m) + "-01";
-  var to = today.y + "-" + Planner.pad(today.m) + "-" + Planner.pad(Planner.daysInMonth(today.y, today.m));
-  var month = list.filter(function (plan) { return plan.end >= from && plan.start <= to; });
-  var box = document.createElement("div");
-  box.className = "dash-month";
-  var cap = document.createElement("b");
-  cap.textContent = "This month";
-  var line = document.createElement("span");
-  line.textContent = Planner.countTrips(month) + " trips · " + Planner.monthDaysAway(list, today.y, today.m) + " days";
-  box.append(cap, line);
-  var up = document.createElement("div");
-  up.className = "dash-up";
   var label = document.createElement("span");
   label.className = "k";
   label.textContent = "Upcoming";
-  up.append(label);
+  host.append(label);
   var iso = todayIso();
   var next = list.filter(function (plan) { return plan.start >= iso; }).sort(function (a, b) {
     return a.start < b.start ? -1 : a.start > b.start ? 1 : 0;
   }).slice(0, 3);
   if (!next.length) {
     var empty = document.createElement("span");
+    empty.className = "dash-empty";
     empty.textContent = "Nothing coming up.";
-    up.append(empty);
-  } else {
-    var ol = document.createElement("ol");
-    next.forEach(function (plan) {
-      var li = document.createElement("li");
-      var button = document.createElement("button");
-      button.type = "button";
-      var name = document.createElement("span");
-      name.textContent = plan.title;
-      var when = document.createElement("span");
-      when.className = "when";
-      when.textContent = Planner.plural(Planner.diffDays(iso, plan.start), "day");
-      button.append(name, when);
-      button.addEventListener("click", function () { focusPlan(plan); });
-      li.append(button);
-      ol.append(li);
-    });
-    up.append(ol);
+    host.append(empty);
+    return;
   }
-  host.append(box, up);
+  var ol = document.createElement("ol");
+  next.forEach(function (plan) {
+    var li = document.createElement("li");
+    var button = document.createElement("button");
+    button.type = "button";
+    var when = document.createElement("span");
+    when.className = "when";
+    when.textContent = shortDate(plan.start);
+    var name = document.createElement("span");
+    name.className = "name";
+    name.textContent = plan.title;
+    var days = document.createElement("span");
+    days.className = "days";
+    var away = Planner.diffDays(iso, plan.start);
+    days.textContent = away + "d";
+    button.append(when, name, days);
+    button.addEventListener("click", function () { focusPlan(plan); });
+    li.append(button);
+    ol.append(li);
+  });
+  host.append(ol);
 }
 
 function renderTodayTile() {
@@ -110,6 +108,7 @@ function renderTodayTile() {
 }
 
 var rhythmNext = null;
+var rhythmUp = null;
 var rhythmLast = null;
 
 function focusPlan(plan) {
@@ -149,70 +148,126 @@ function dashEvent(which, plan, days, soon) {
   button.dataset.which = which;
   var caption = document.createElement("span");
   caption.className = "k";
-  caption.textContent = which === "next" ? "Next" : "Last";
+  caption.textContent = which === "up" ? "Up next" : (which === "last" ? "Last" : "Next");
+  var row = document.createElement("span");
+  row.className = "row";
+  var name = document.createElement("span");
+  name.className = "name";
+  name.textContent = plan ? plan.title : "None";
+  row.append(name);
+  if (plan) {
+    var num = document.createElement("b");
+    num.className = "num";
+    num.textContent = String(days);
+    var unit = document.createElement("span");
+    unit.className = "unit";
+    unit.textContent = soon ? (days === 1 ? "day" : "days") : "days ago";
+    row.append(num, unit);
+    var lead = which === "up" ? "Up next: " : (which === "last" ? "Last: " : "Next: ");
+    button.title = lead + plan.title + " " + dayPhrase(days, soon);
+  } else {
+    button.disabled = true;
+  }
+  button.append(caption, row);
+  return button;
+}
+
+function soonCell(plan, today) {
+  var button = document.createElement("button");
+  button.type = "button";
+  button.className = "soon-cell";
+  var when = document.createElement("span");
+  when.className = "when";
+  when.textContent = shortDate(plan.start);
   var name = document.createElement("span");
   name.className = "name";
   name.textContent = plan.title;
-  var num = document.createElement("span");
-  num.className = "num";
-  num.textContent = String(days);
-  var unit = document.createElement("span");
-  unit.className = "unit";
-  unit.textContent = (days === 1 ? "day" : "days") + (soon ? "" : " ago");
-  button.append(caption, name, num, unit);
-  button.title = (which === "next" ? "Next: " : "Last: ") + plan.title + " " + dayPhrase(days, soon);
+  var days = document.createElement("b");
+  days.className = "days";
+  days.textContent = Planner.diffDays(today, plan.start) + "d";
+  button.append(when, days, name);
+  var meta = plan.time || plan.location || "";
+  if (plan.time && plan.location) meta = plan.time + " · " + plan.location;
+  if (meta) {
+    var line = document.createElement("span");
+    line.className = "meta";
+    line.textContent = meta;
+    button.append(line);
+  }
+  button.addEventListener("click", function () { focusPlan(plan); });
+  return button;
+}
+
+function lastLine(plan, today) {
+  var button = document.createElement("button");
+  button.type = "button";
+  button.className = "dash-event last-line";
+  button.dataset.which = "last";
+  if (!plan) {
+    button.textContent = "Last · none";
+    button.disabled = true;
+    return button;
+  }
+  button.textContent = "Last · " + plan.title + " · " + Planner.diffDays(plan.end, today) + "d ago";
+  button.title = "Last: " + plan.title;
   return button;
 }
 
 function renderRhythm() {
   var today = todayIso();
   var past = null;
-  var future = null;
+  var futures = [];
   plans.forEach(function (plan) {
     if (plan.end < today && (!past || plan.end > past.end)) past = plan;
-    if (plan.start > today && (!future || plan.start < future.start)) future = plan;
+    if (plan.start > today) futures.push(plan);
   });
+  futures.sort(function (a, b) {
+    return a.start < b.start ? -1 : a.start > b.start ? 1 : 0;
+  });
+  var future = futures[0] || null;
+  var up = futures[1] || null;
+  var after = futures.slice(1, 4);
   rhythmNext = future;
+  rhythmUp = up;
   rhythmLast = past;
   var host = document.getElementById("rhythm");
   if (!host) return;
   host.replaceChildren();
-  var track = document.createElement("div");
-  track.className = "dash-track";
-  var set = document.createElement("div");
-  set.className = "dash-set";
-  if (!future && !past) {
-    var empty = document.createElement("p");
-    empty.className = "dash-empty";
-    empty.textContent = "No plans before or after today.";
-    set.append(empty);
-  } else {
-    if (future) set.append(dashEvent("next", future, Planner.diffDays(today, future.start), true));
-    if (past) set.append(dashEvent("last", past, Planner.diffDays(past.end, today), false));
+  function group(which, plan, soon) {
+    var node = document.createElement("div");
+    node.className = "dash-group is-" + which;
+    var days = plan ? Planner.diffDays(soon ? today : plan.end, soon ? plan.start : today) : 0;
+    node.append(dashEvent(which, plan, days, soon));
+    return node;
   }
-  track.append(set);
-  host.append(track);
-  requestAnimationFrame(fitMarquee);
+  var soon = document.createElement("div");
+  soon.className = "dash-group is-soon";
+  var soonLabel = document.createElement("span");
+  soonLabel.className = "k";
+  soonLabel.textContent = "Upcoming";
+  var row = document.createElement("div");
+  row.className = "soon-row";
+  if (!after.length) {
+    var empty = document.createElement("span");
+    empty.className = "dash-empty";
+    empty.textContent = "None";
+    row.append(empty);
+  } else {
+    after.forEach(function (plan) { row.append(soonCell(plan, today)); });
+  }
+  soon.append(soonLabel, row);
+  var last = document.createElement("div");
+  last.className = "dash-group is-last";
+  var lastDays = past ? Planner.diffDays(past.end, today) : 0;
+  var lastCell = dashEvent("last", past, lastDays, false);
+  lastCell.classList.add("last-cell");
+  var lastUnit = lastCell.querySelector(".unit");
+  if (lastUnit) lastUnit.textContent = "d ago";
+  last.append(lastLine(past, today), lastCell);
+  host.append(group("next", future, true), group("up", up, true), soon, last);
 }
 
-function fitMarquee() {
-  var host = document.getElementById("rhythm");
-  if (!host) return;
-  var track = host.querySelector(".dash-track");
-  var set = track && track.querySelector(".dash-set");
-  if (!track || !set) return;
-  track.querySelectorAll(".dash-set[data-clone]").forEach(function (node) { node.remove(); });
-  track.classList.remove("is-long");
-  var reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  if (reduce || set.querySelector(".dash-empty")) return;
-  if (track.scrollWidth <= host.clientWidth + 1) return;
-  var clone = set.cloneNode(true);
-  clone.setAttribute("data-clone", "1");
-  clone.setAttribute("aria-hidden", "true");
-  clone.querySelectorAll("button").forEach(function (button) { button.tabIndex = -1; });
-  track.append(clone);
-  track.classList.add("is-long");
-}
+function fitMarquee() {}
 
 function renderRangeNote() {
   var note = document.getElementById("range-note");
@@ -270,6 +325,8 @@ function todayIso() {
 
 function buildGrid() {
   var months = Planner.monthsInRange(RANGE_START, RANGE_END);
+  var bar = document.createElement("div");
+  bar.className = "dayhead-bar";
   var calendar = document.createElement("div");
   calendar.className = "calendar";
   calendar.setAttribute("role", "grid");
@@ -278,30 +335,30 @@ function buildGrid() {
 
   function head(className, text, column) {
     var el = document.createElement("div");
-    el.className = className + " dayhead";
+    el.className = className;
     el.textContent = text;
     el.style.gridColumn = String(column);
-    el.style.gridRow = "1";
     return el;
   }
 
-  calendar.append(head("corner", "Month", 1));
+  var monthHead = head("corner", "Month", 1);
+  monthHead.title = "Month";
+  bar.append(monthHead);
   for (var day = 1; day <= 31; day++) {
     var num = head("daynum", Planner.pad(day), day + 1);
     num.dataset.day = String(day);
-    calendar.append(num);
+    bar.append(num);
   }
   var away = document.createElement("button");
   away.type = "button";
-  away.className = "away-head dayhead";
+  away.className = "away-head";
   away.textContent = "Away";
   away.title = "Days away from home this month";
   away.setAttribute("aria-label", "Days away from home this month");
   away.style.gridColumn = "33";
-  away.style.gridRow = "1";
-  calendar.append(away);
+  bar.append(away);
 
-  var row = 2;
+  var row = 1;
   months.forEach(function (month, index) {
     if (month.m === 1 && index > 0) {
       var divider = document.createElement("div");
@@ -325,6 +382,7 @@ function buildGrid() {
     label.className = "month";
     label.dataset.ym = key;
     label.dataset.row = String(row);
+    if (key < today.slice(0, 7)) label.classList.add("is-gone");
     if (key === today.slice(0, 7)) label.classList.add("now");
     var monthNum = document.createElement("span");
     monthNum.className = "num";
@@ -360,7 +418,7 @@ function buildGrid() {
         if (iso === today) {
           cell.classList.add("today");
           letter.classList.add("today");
-          var headDay = calendar.querySelector('.daynum[data-day="' + d + '"]');
+          var headDay = bar.querySelector('.daynum[data-day="' + d + '"]');
           if (headDay) headDay.classList.add("today");
         }
         cell.append(letter);
@@ -379,7 +437,7 @@ function buildGrid() {
     row += 1;
   });
 
-  board.replaceChildren(calendar);
+  board.replaceChildren(bar, calendar);
 }
 
 function googleMark() {
@@ -394,10 +452,6 @@ function googleMark() {
   return svg;
 }
 
-function singleStackHeight(count) {
-  return Planner.singleMarkerReserve(count);
-}
-
 function syncBars() {
   var list = visible();
   var laid = Planner.layout(list, RANGE_START + "-01-01", RANGE_END + "-12-31");
@@ -410,13 +464,8 @@ function syncBars() {
     if (!groups[iso]) groups[iso] = [];
     groups[iso].push(seg);
   });
-  var monthReserve = Object.create(null);
-  Object.keys(groups).forEach(function (iso) {
-    var ym = iso.slice(0, 7);
-    var height = singleStackHeight(groups[iso].length);
-    if (!monthReserve[ym] || height > monthReserve[ym]) monthReserve[ym] = height;
-  });
   var tooled = {};
+  var today = todayIso();
   laid.bars.forEach(function (bar) {
     var plan = bar.plan;
     var host = board.querySelector('.month[data-ym="' + bar.y + "-" + Planner.pad(bar.month) + '"]');
@@ -424,19 +473,28 @@ function syncBars() {
     var el = document.createElement("button");
     el.type = "button";
     el.className = "bar";
+    var past = plan.end < today;
+    var ongoing = plan.start <= today && plan.end >= today;
+    var span = bar.endDay - bar.startDay + 1;
     if (bar.continuesBefore) el.classList.add("cont-before");
     if (bar.continuesAfter) el.classList.add("cont-after");
+    if (past) el.classList.add("is-past");
+    if (ongoing) {
+      el.classList.add("is-now");
+      el.style.setProperty("--progress", segmentProgress(bar, today) + "%");
+    }
+    if (rhythmNext && plan.id === rhythmNext.id) el.classList.add("is-next");
+    if (span <= 2 && !bar.continuesBefore && !bar.continuesAfter) el.classList.add("is-brief");
     if (plan.id === selectedId) el.classList.add("selected");
     el.style.setProperty("--cat", plan.color || "#74a869");
     var ym = bar.y + "-" + Planner.pad(bar.month);
-    el.style.setProperty("--singles", (monthReserve[ym] || 0) + "px");
     el.style.gridColumn = (bar.startDay + 1) + " / " + (bar.endDay + 2);
     el.style.gridRow = host.dataset.row;
     el.style.setProperty("--lane", String(bar.lane));
     el.style.setProperty("--lanes", String(laid.lanes[ym] || 1));
     el.dataset.id = plan.id;
     var progress = Planner.checklistProgress(plan);
-    var tip = plan.title + " · " + bar.days + "d" + (progress ? " · " + progress.done + "/" + progress.total : "");
+    var tip = planAria(plan, bar.days + (bar.days === 1 ? " day" : " days") + (progress ? ", " + progress.done + " of " + progress.total : ""));
     el.title = tip;
     el.setAttribute("aria-label", tip);
 
@@ -453,14 +511,10 @@ function syncBars() {
     text.textContent = plan.title;
     var count = document.createElement("span");
     count.className = "count";
-    var countFull = document.createElement("span");
-    countFull.className = "count-full";
-    var progressBit = progress ? " · " + progress.done + "/" + progress.total : "";
-    countFull.textContent = " · " + bar.days + "d" + progressBit;
-    var countShort = document.createElement("span");
-    countShort.className = "count-short";
-    countShort.textContent = "·" + bar.days + "d" + (progress ? "·" + progress.done + "/" + progress.total : "");
-    count.append(countFull, countShort);
+    var pill = document.createElement("span");
+    pill.className = "pill";
+    pill.textContent = bar.days + "d";
+    count.append(pill);
     fill.append(text, count);
     if (bar.continuesAfter) {
       var after = document.createElement("span");
@@ -491,12 +545,28 @@ function syncBars() {
     var segs = groups[iso];
     var host = board.querySelector('.month[data-ym="' + iso.slice(0, 7) + '"]');
     if (!host || !segs.length) return;
-    var shown = Math.min(segs.length, 3);
-    for (var i = 0; i < shown; i++) {
+    if (segs.length >= 3) {
+      var more = document.createElement("button");
+      more.type = "button";
+      more.className = "single-more";
+      more.dataset.date = iso;
+      more.style.gridColumn = String(segs[0].startDay + 1);
+      more.style.gridRow = host.dataset.row;
+      more.textContent = String(segs.length);
+      more.setAttribute("aria-label", Planner.plural(segs.length, "plan") + " on " + shortDate(iso));
+      calendar.append(more);
+      return;
+    }
+    var mini = segs.length === 2;
+    for (var i = 0; i < segs.length; i++) {
       var plan = segs[i].plan;
       var tick = document.createElement("button");
       tick.type = "button";
       tick.className = "bar single";
+      if (mini) tick.classList.add("is-mini");
+      if (plan.end < today) tick.classList.add("is-past");
+      if (iso === today) tick.classList.add("is-today");
+      if (rhythmNext && plan.id === rhythmNext.id) tick.classList.add("is-next");
       if (plan.id === selectedId) tick.classList.add("selected");
       tick.style.setProperty("--cat", plan.color || "#74a869");
       tick.style.setProperty("--slot", String(i));
@@ -504,34 +574,56 @@ function syncBars() {
       tick.style.gridRow = host.dataset.row;
       tick.dataset.id = plan.id;
       tick.dataset.date = iso;
-      var oneProgress = Planner.checklistProgress(plan);
-      var oneTip = plan.title + (oneProgress ? " · " + oneProgress.done + "/" + oneProgress.total : "");
+      var oneTip = planAria(plan);
       tick.setAttribute("aria-label", oneTip);
       tick.title = oneTip;
       var mark = document.createElement("span");
       mark.className = "fill single";
-      var cap = document.createElement("span");
-      cap.className = "mark-label";
-      cap.textContent = plan.title;
-      tick.append(mark, cap);
-      if (plan.source === "gcal") {
-        tick.classList.add("is-gcal");
-        tick.append(googleMark());
+      tick.append(mark);
+      if (!mini) {
+        var cap = document.createElement("span");
+        cap.className = "mark-label";
+        cap.textContent = dotCaption(plan);
+        tick.append(cap);
       }
+      if (plan.source === "gcal") tick.classList.add("is-gcal");
       calendar.append(tick);
     }
-    if (segs.length > 3) {
-      var more = document.createElement("button");
-      more.type = "button";
-      more.className = "single-more";
-      more.dataset.date = iso;
-      more.style.gridColumn = String(segs[0].startDay + 1);
-      more.style.gridRow = host.dataset.row;
-      more.textContent = "+" + (segs.length - 3);
-      more.setAttribute("aria-label", Planner.plural(segs.length - 3, "more plan"));
-      calendar.append(more);
-    }
   });
+}
+
+function segmentProgress(bar, today) {
+  var span = bar.endDay - bar.startDay + 1;
+  if (span < 1) return 0;
+  var segStart = cellDate(bar.y, bar.month, bar.startDay);
+  var segEnd = cellDate(bar.y, bar.month, bar.endDay);
+  var done = 0;
+  if (today >= segEnd) done = span;
+  else if (today >= segStart) done = Planner.diffDays(segStart, today) + 1;
+  return Math.max(0, Math.min(100, Math.round(done / span * 100)));
+}
+
+function dotCaption(plan) {
+  var clock = String(plan && plan.time || "");
+  var match = clock.match(/^0?(\d{1,2}:\d{2})$/);
+  if (match) return match[1];
+  var word = String(plan && plan.title || "").trim().split(/\s+/)[0] || "";
+  return word.slice(0, 7);
+}
+
+function planAria(plan, extra) {
+  var when = plan.start === plan.end
+    ? shortDate(plan.start)
+    : shortDate(plan.start) + " to " + shortDate(plan.end);
+  var bits = [plan.title, when];
+  if (extra) bits.push(extra);
+  if (plan.time) bits.push(plan.time);
+  if (plan.location) bits.push(plan.location);
+  return bits.join(", ");
+}
+
+function dotTip(plan) {
+  return planAria(plan);
 }
 
 function syncTotals() {
@@ -549,13 +641,35 @@ function syncTotals() {
 
 /* Drop "·Nd" before the name truncates. Full title and days stay on the bar tooltip. */
 function fitBarLabels() {
-  board.querySelectorAll(".bar:not(.single) .fill").forEach(function (fill) {
+  board.querySelectorAll(".bar:not(.single):not(.is-brief) .fill").forEach(function (fill) {
     var label = fill.querySelector(".label");
     var count = fill.querySelector(".count");
     if (!label || !count) return;
     count.classList.remove("is-dropped");
     if (!Planner.barKeepsDayCount(label.scrollWidth, label.clientWidth)) count.classList.add("is-dropped");
   });
+  fitDotLabels();
+}
+
+/* Hide a day-dot label when the word does not fit beside the dot. */
+function fitDotLabels() {
+  board.querySelectorAll(".bar.single:not(.is-mini)").forEach(function (tick) {
+    var label = tick.querySelector(".mark-label");
+    if (!label) return;
+    label.classList.remove("is-hidden");
+    if (getComputedStyle(label).display === "none") return;
+    if (tick.scrollWidth > tick.clientWidth + 1) label.classList.add("is-hidden");
+  });
+}
+
+function syncEmpty() {
+  var old = board.querySelector(".empty-hint");
+  if (old) old.remove();
+  if (plans.length) return;
+  var hint = document.createElement("p");
+  hint.className = "empty-hint";
+  hint.textContent = "Drag across days to add your first plan";
+  board.append(hint);
 }
 
 function syncTips() {
@@ -576,7 +690,7 @@ function paintFocus() {
 }
 
 function headHeight() {
-  var head = board.querySelector(".dayhead");
+  var head = board.querySelector(".dayhead-bar");
   var measured = head ? head.getBoundingClientRect().height : 0;
   if (!(measured > 0)) {
     var raw = parseFloat(getComputedStyle(board).getPropertyValue("--head"));

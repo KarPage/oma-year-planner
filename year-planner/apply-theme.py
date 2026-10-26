@@ -97,6 +97,18 @@ def main() -> None:
     ]
     for name, keys in ALIASES.items():
         lines.append(f"  --{name}: {pick(colors, keys, fallbacks[name])};")
+    # Trip default follows the theme accent. The other five stay distinct;
+    # this theme's named hues are one green family.
+    lines.append(f"  --teal: {pick(colors, ('accent', 'selection', 'green'), fallbacks['accent'])};")
+    calm = (
+        ("sky", "#8eb6d4"),
+        ("lavender", "#c3b2dc"),
+        ("sand", "#e4c48a"),
+        ("rose", "#e3a8b2"),
+        ("mint", "#8fceb6"),
+    )
+    for name, value in calm:
+        lines.append(f"  --{name}: {value};")
     lines.append("}")
     lines.append("")
     OUT.write_text("\n".join(lines))

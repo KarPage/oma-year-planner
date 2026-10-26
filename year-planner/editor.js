@@ -298,19 +298,25 @@ function setDraftType(type) {
   });
 }
 
+function defaultSwatch(type) {
+  if (type === "Event") return themeSwatch("--sky") || "#8eb6d4";
+  if (type === "Reminder") return themeSwatch("--sand") || "#e4c48a";
+  return themeSwatch("--accent") || themeSwatch("--teal") || "#41a468";
+}
+
 function paintEditorSwatches() {
   var row = document.getElementById("f-swatches");
   if (!row) return;
   row.replaceChildren();
-  ["--travel", "--work", "--personal", "--other", "--accent", "--range"].forEach(function (name) {
-    var hex = themeSwatch(name);
+  PLAN_SWATCHES.forEach(function (swatch) {
+    var hex = themeSwatch(swatch.name);
     if (!hex) return;
     var button = document.createElement("button");
     button.type = "button";
     button.className = "swatch";
-    button.style.background = "var(" + name + ")";
+    button.style.background = "var(" + swatch.name + ")";
     button.setAttribute("role", "radio");
-    button.setAttribute("aria-label", name.slice(2));
+    button.setAttribute("aria-label", swatch.label);
     button.setAttribute("aria-checked", colorInput.value.toLowerCase() === hex ? "true" : "false");
     button.setAttribute("aria-pressed", colorInput.value.toLowerCase() === hex ? "true" : "false");
     button.addEventListener("click", function () {
@@ -385,15 +391,16 @@ function openEditor(plan, defaults, focusNote) {
   editingId = plan ? plan.id : null;
   formError.textContent = "";
   titleInput.value = plan ? plan.title : "";
-  colorInput.value = plan && plan.color ? plan.color : (themeSwatch("--travel") || "#74a869");
   var start = plan ? plan.start : (defaults && defaults.start) || cellDate(year, todayParts().m, todayParts().d);
   var end = plan ? plan.end : (defaults && defaults.end) || start;
   if (!plan && defaults && defaults.single) end = start;
   if (end < start) end = start;
+  var nextType = plan && plan.type ? plan.type : (start === end ? "Event" : "Trip");
+  colorInput.value = plan && plan.color ? plan.color : defaultSwatch(nextType);
   startInput.value = start;
   endInput.value = end;
   setSpanMode(start === end ? "single" : "trip");
-  setDraftType(plan && plan.type ? plan.type : (start === end ? "Event" : "Trip"));
+  setDraftType(nextType);
   noteInput.value = plan && plan.note ? plan.note : "";
   draftChecks = plan && plan.checklist ? plan.checklist.map(function (item) {
     return { id: item.id || "", text: item.text, done: !!item.done };
@@ -467,7 +474,13 @@ document.getElementById("f-attach").addEventListener("click", function () {
 document.getElementById("span-single").addEventListener("click", function () { setSpanMode("single"); });
 document.getElementById("span-trip").addEventListener("click", function () { setSpanMode("trip"); });
 document.querySelectorAll(".type-btn").forEach(function (button) {
-  button.addEventListener("click", function () { setDraftType(button.dataset.type); });
+  button.addEventListener("click", function () {
+    setDraftType(button.dataset.type);
+    if (!editingId) {
+      colorInput.value = defaultSwatch(draftType);
+      paintEditorSwatches();
+    }
+  });
 });
 startInput.addEventListener("change", updateDayCount);
 endInput.addEventListener("change", updateDayCount);

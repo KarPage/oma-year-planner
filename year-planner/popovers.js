@@ -44,7 +44,10 @@ function showTip(iso, x, y) {
   tipEl.replaceChildren();
   list.forEach(function (plan) {
     var line = document.createElement("div");
-    line.textContent = plan.title;
+    var bits = [plan.title];
+    if (plan.time) bits.push(plan.time);
+    if (plan.location) bits.push(plan.location);
+    line.textContent = bits.join(" · ");
     tipEl.append(line);
   });
   placeElement(tipEl, {
@@ -64,7 +67,7 @@ function closeDayList() {
 function openDayList(iso, anchor) {
   if (!dayList) return;
   var all = plansOn(iso).filter(Planner.isSingleDay);
-  var list = all.length > 3 ? all.slice(3) : all;
+  var list = all;
   if (!list.length) return;
   hideTip();
   dayList.hidden = false;
@@ -131,18 +134,27 @@ function themeSwatch(name) {
   return /^#[0-9a-fA-F]{6}$/.test(value) ? value.toLowerCase() : "";
 }
 
+var PLAN_SWATCHES = [
+  { name: "--teal", label: "Teal" },
+  { name: "--sky", label: "Sky" },
+  { name: "--lavender", label: "Lavender" },
+  { name: "--sand", label: "Sand" },
+  { name: "--rose", label: "Rose" },
+  { name: "--mint", label: "Mint" }
+];
+
 function paintQuickSwatches(plan) {
   var row = document.getElementById("qe-swatches");
   if (!row) return;
   row.replaceChildren();
-  ["--travel", "--work", "--personal", "--other", "--accent", "--range"].forEach(function (name) {
-    var hex = themeSwatch(name);
+  PLAN_SWATCHES.forEach(function (swatch) {
+    var hex = themeSwatch(swatch.name);
     if (!hex) return;
     var button = document.createElement("button");
     button.type = "button";
     button.className = "qe-swatch";
-    button.style.background = "var(" + name + ")";
-    button.setAttribute("aria-label", name.slice(2));
+    button.style.background = "var(" + swatch.name + ")";
+    button.setAttribute("aria-label", swatch.label);
     button.setAttribute("aria-pressed", plan.color === hex ? "true" : "false");
     button.addEventListener("click", function () {
       saveQuick({ color: hex });
@@ -516,6 +528,7 @@ function render() {
   if (!board.querySelector(".calendar")) buildGrid();
   refreshToday();
   syncBars();
+  syncEmpty();
   syncTotals();
   syncTips();
   paintSelection();

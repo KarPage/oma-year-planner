@@ -46,6 +46,13 @@
       <button class="icon-btn" id="next" type="button" aria-label="Next year" title="Scroll to January of the next year">→</button>
       <button class="ghost" id="today" type="button">Today</button>
       <button class="ghost" id="rolling" type="button" aria-pressed="false" title="Start the view at the current month">Rolling 12</button>
+      <button class="ghost" id="pin-desk" type="button" aria-pressed="false" title="Pin the year board to the desktop wallpaper">
+        <svg viewBox="0 0 16 16" aria-hidden="true">
+          <rect x="1.5" y="2.5" width="13" height="9" rx="1" fill="none" stroke="currentColor" stroke-width="1.3"/>
+          <path d="M8 11.5v2M5.5 13.5h5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+        </svg>
+        <span id="pin-desk-label">Pin to desktop</span>
+      </button>
       <button class="icon-btn" id="keys-btn" type="button" aria-label="Help and shortcuts" title="Help and shortcuts">
         <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
           <rect x="1" y="3.5" width="14" height="9" rx="1.2" fill="none" stroke="currentColor" stroke-width="1.3"/>
@@ -63,7 +70,7 @@
 
   <section class="intro" aria-label="Overview">
     <div class="dash">
-      <div class="stats" id="stats"></div>
+      <div class="stats dash-group" id="stats"></div>
       <button class="stat-box gcal-tile" id="gcal-tile" type="button" hidden>
         <span class="gcal-row">
           <svg class="g-mark" viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M8 1.6a6.4 6.4 0 1 0 5.7 9.2H8.1V8.2h6.6A6.4 6.4 0 0 0 8 1.6z"/></svg>
@@ -134,6 +141,7 @@
       <h2 id="help-title">How it works</h2>
       <p class="help-sub">Your whole year at a glance.</p>
       <p class="help-gcal">Google Calendar is optional and read-only. Events come straight from Google to this browser. Nothing is sent back. Disconnect removes them.</p>
+      <p class="help-pin">Pin to desktop: W / Super+Shift+Y</p>
       <div class="help-cards" id="help-cards">
         <article class="help-card">
           <div class="mini mini-drag" aria-hidden="true"><span></span><span></span><span class="on"></span><span class="on"></span><span class="on"></span><span></span><i class="cursor"></i></div>
@@ -203,6 +211,8 @@
           <span><kbd>Esc</kbd> Close</span>
           <span><kbd>Ctrl</kbd>+<kbd>Z</kbd> Undo</span>
           <span><kbd>?</kbd> Help</span>
+          <span><kbd>W</kbd> Pin desktop</span>
+          <span><kbd>Super</kbd>+<kbd>Shift</kbd>+<kbd>Y</kbd> Pin desktop</span>
           <span><kbd>Shift</kbd>+<kbd>↑</kbd><kbd>↓</kbd> Scroll</span>
         </div>
       </div>
@@ -314,6 +324,8 @@
     <p class="qe-tip">Tip: drag the marker to another day to move it.</p>
   </div>
   <div class="away-pop" id="gcal-pop" hidden role="dialog" aria-modal="true" aria-label="Google Calendar" tabindex="-1"></div>
+
+  <p class="toast" id="toast" role="status" hidden></p>
 
   <script defer src="version.js"></script>
   <script defer src="config.js"></script>
