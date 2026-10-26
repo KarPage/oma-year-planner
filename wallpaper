@@ -195,7 +195,8 @@ cmd_unpin() {
     omarchy-theme-bg-set "$wall" >/dev/null
     clear_state
     echo "restored $wall"
-    exec "$ROOT/open"
+    # Close the lock first so Chromium does not keep holding it.
+    exec "$ROOT/open" 9>&-
   fi
   clear_state
   echo "unpinned"

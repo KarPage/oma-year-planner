@@ -50,7 +50,15 @@ A still picture of the board, laid over the desktop. Nothing on it clicks or mov
 
 In the planner, **Pin to desktop** does the same thing. Press `W`, or `Super+Shift+Y` from anywhere.
 
-Left-click the bar icon: `./open`. Right-click: `./wallpaper toggle`.
+Left-click the bar icon for a small menu: open the planner, pin or unpin, full screen, refresh the pinned picture, or quit. Right-click pins or unpins straight away.
+
+```
+./app status       how many planner windows are open, and whether the helper runs
+./app fullscreen   open the planner if needed, then toggle full screen
+./app quit         close the planner windows and stop the helper
+```
+
+`./app quit` only closes planner windows, never other browser windows. It leaves the pinned picture and the midnight repaint alone.
 
 While it is pinned, the picture is painted again at midnight, and again when the planner window closes.
 
