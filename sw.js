@@ -17,7 +17,7 @@ var FILES = [
   "./app.js",
   "./theme.css",
   "./theme-defaults.css",
-  "./manifest.json",
+  "./app.webmanifest",
   "./icon.svg"
 ];
 
