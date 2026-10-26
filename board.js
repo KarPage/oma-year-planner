@@ -88,14 +88,8 @@ function renderDashExtra(list) {
     var days = document.createElement("span");
     days.className = "days";
     var away = Planner.diffDays(iso, plan.start);
-    days.textContent = away === 0 ? "today" : Planner.plural(away, "day");
-    function sep() {
-      var mark = document.createElement("span");
-      mark.className = "sep";
-      mark.textContent = "·";
-      return mark;
-    }
-    button.append(when, sep(), name, sep(), days);
+    days.textContent = away + "d";
+    button.append(when, name, days);
     button.addEventListener("click", function () { focusPlan(plan); });
     li.append(button);
     ol.append(li);
@@ -167,7 +161,7 @@ function dashEvent(which, plan, days, soon) {
     num.textContent = String(days);
     var unit = document.createElement("span");
     unit.className = "unit";
-    unit.textContent = soon ? (days === 1 ? "day" : "days") : (days === 1 ? "day ago" : "days ago");
+    unit.textContent = soon ? (days === 1 ? "day" : "days") : "days ago";
     row.append(num, unit);
     button.title = (which === "next" ? "Next: " : "Last: ") + plan.title + " " + dayPhrase(days, soon);
   } else {
@@ -468,13 +462,27 @@ function syncBars() {
     var segs = groups[iso];
     var host = board.querySelector('.month[data-ym="' + iso.slice(0, 7) + '"]');
     if (!host || !segs.length) return;
-    var shown = Math.min(segs.length, 3);
-    for (var i = 0; i < shown; i++) {
+    if (segs.length >= 3) {
+      var more = document.createElement("button");
+      more.type = "button";
+      more.className = "single-more";
+      more.dataset.date = iso;
+      more.style.gridColumn = String(segs[0].startDay + 1);
+      more.style.gridRow = host.dataset.row;
+      more.textContent = String(segs.length);
+      more.setAttribute("aria-label", Planner.plural(segs.length, "plan"));
+      calendar.append(more);
+      return;
+    }
+    var mini = segs.length === 2;
+    for (var i = 0; i < segs.length; i++) {
       var plan = segs[i].plan;
       var tick = document.createElement("button");
       tick.type = "button";
       tick.className = "bar single";
+      if (mini) tick.classList.add("is-mini");
       if (plan.end < today) tick.classList.add("is-past");
+      if (iso === today) tick.classList.add("is-today");
       if (plan.id === selectedId) tick.classList.add("selected");
       tick.style.setProperty("--cat", plan.color || "#74a869");
       tick.style.setProperty("--slot", String(i));
@@ -482,34 +490,36 @@ function syncBars() {
       tick.style.gridRow = host.dataset.row;
       tick.dataset.id = plan.id;
       tick.dataset.date = iso;
-      var oneProgress = Planner.checklistProgress(plan);
-      var oneTip = plan.title + (oneProgress ? " · " + oneProgress.done + "/" + oneProgress.total : "");
+      var oneTip = dotTip(plan);
       tick.setAttribute("aria-label", oneTip);
-      tick.title = oneTip;
       var mark = document.createElement("span");
       mark.className = "fill single";
-      var cap = document.createElement("span");
-      cap.className = "mark-label";
-      cap.textContent = plan.title;
-      tick.append(mark, cap);
-      if (plan.source === "gcal") {
-        tick.classList.add("is-gcal");
-        tick.append(googleMark());
+      tick.append(mark);
+      if (!mini) {
+        var cap = document.createElement("span");
+        cap.className = "mark-label";
+        cap.textContent = dotCaption(plan);
+        tick.append(cap);
       }
+      if (plan.source === "gcal") tick.classList.add("is-gcal");
       calendar.append(tick);
     }
-    if (segs.length > 3) {
-      var more = document.createElement("button");
-      more.type = "button";
-      more.className = "single-more";
-      more.dataset.date = iso;
-      more.style.gridColumn = String(segs[0].startDay + 1);
-      more.style.gridRow = host.dataset.row;
-      more.textContent = "+" + (segs.length - 3);
-      more.setAttribute("aria-label", Planner.plural(segs.length - 3, "more plan"));
-      calendar.append(more);
-    }
   });
+}
+
+function dotCaption(plan) {
+  var clock = String(plan && plan.time || "");
+  var match = clock.match(/^0?(\d{1,2}:\d{2})$/);
+  if (match) return match[1];
+  var word = String(plan && plan.title || "").trim().split(/\s+/)[0] || "";
+  return word.slice(0, 7);
+}
+
+function dotTip(plan) {
+  var bits = [plan.title];
+  if (plan.time) bits.push(plan.time);
+  if (plan.location) bits.push(plan.location);
+  return bits.join(" · ");
 }
 
 function syncTotals() {

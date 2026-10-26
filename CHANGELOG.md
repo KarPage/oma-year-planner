@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Sharp terminal chrome. Next and Last are flat neon counts. One-day marks are dots with a short label.
 - The dashboard is four groups: counts, Next, Last, and a short Upcoming list.
 - Plan bars are glass. The editor palette is teal, sky, lavender, sand, rose, and mint.
 - Plan bars are solid, with a duration pill. One- and two-day plans are dots. The board scrollbar stays hidden.

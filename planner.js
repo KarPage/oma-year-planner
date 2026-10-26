@@ -643,6 +643,13 @@ var Planner = (function () {
     return match[1];
   }
 
+  function gcalClock(point) {
+    var stamp = String(point && point.dateTime || "");
+    var match = stamp.match(/T(\d{2}):(\d{2})/);
+    if (!match) return "";
+    return String(+match[1]) + ":" + match[2];
+  }
+
   function gcalSpan(event) {
     var start = gcalPoint(event && event.start, false);
     if (!start) return null;
@@ -683,6 +690,7 @@ var Planner = (function () {
     var description = gcalPlain(event.description);
     var note = location && description ? location + "\n" + description : (location || description);
     var color = nearestSwatch(calendar && calendar.backgroundColor, palette);
+    var clock = gcalClock(event.start);
     return normalize({
       id: "gcal-" + key,
       title: title,
@@ -690,6 +698,8 @@ var Planner = (function () {
       type: span.days >= 2 ? "Trip" : "Event",
       color: color,
       note: note,
+      time: clock,
+      location: location,
       start: span.start,
       end: span.end,
       source: "gcal",
@@ -828,6 +838,10 @@ var Planner = (function () {
     var link = gcalSafeLink(raw.htmlLink);
     if (link) plan.htmlLink = link;
     if (raw.gcalCal) plan.gcalCal = String(raw.gcalCal).slice(0, 320);
+    var when = String(raw.time || "").trim().slice(0, 8);
+    if (/^\d{1,2}:\d{2}$/.test(when)) plan.time = when;
+    var place = String(raw.location || "").trim().slice(0, 120);
+    if (place) plan.location = place;
     return plan;
   }
 
@@ -854,7 +868,9 @@ var Planner = (function () {
       gcalId: pick("gcalId"),
       etag: pick("etag"),
       htmlLink: pick("htmlLink"),
-      gcalCal: pick("gcalCal")
+      gcalCal: pick("gcalCal"),
+      time: pick("time"),
+      location: pick("location")
     });
   }
 
@@ -1192,6 +1208,7 @@ var Planner = (function () {
     var mapped = gcalEventToPlan(flight, calendar);
     if (!mapped || mapped.type !== "Event" || mapped.title !== "Flight" || mapped.tag !== "Gmail") errors.push("gcal event");
     if (!mapped || mapped.note !== "SFO\nGate 12" || mapped.source !== "gcal" || mapped.gcalId !== "primary:e1") errors.push("gcal note");
+    if (!mapped || mapped.time !== "9:00" || mapped.location !== "SFO") errors.push("gcal when");
     if (!mapped || mapped.htmlLink.indexOf("https://www.google.com/calendar/") !== 0) errors.push("gcal link");
     var week = gcalEventToPlan({
       id: "trip",
@@ -1209,6 +1226,7 @@ var Planner = (function () {
       end: { date: "2026-06-02" }
     }, calendar);
     if (!oneDay || oneDay.type !== "Event" || oneDay.start !== oneDay.end) errors.push("gcal allday");
+    if (oneDay && oneDay.time) errors.push("gcal allday time");
     var span = gcalEventToPlan({
       id: "span",
       status: "confirmed",

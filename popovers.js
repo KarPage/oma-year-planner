@@ -44,7 +44,10 @@ function showTip(iso, x, y) {
   tipEl.replaceChildren();
   list.forEach(function (plan) {
     var line = document.createElement("div");
-    line.textContent = plan.title;
+    var bits = [plan.title];
+    if (plan.time) bits.push(plan.time);
+    if (plan.location) bits.push(plan.location);
+    line.textContent = bits.join(" · ");
     tipEl.append(line);
   });
   placeElement(tipEl, {
@@ -64,7 +67,7 @@ function closeDayList() {
 function openDayList(iso, anchor) {
   if (!dayList) return;
   var all = plansOn(iso).filter(Planner.isSingleDay);
-  var list = all.length > 3 ? all.slice(3) : all;
+  var list = all;
   if (!list.length) return;
   hideTip();
   dayList.hidden = false;
