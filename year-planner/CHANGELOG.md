@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.1.5
+
+- Pin to desktop takes about a second instead of half a minute. The board page asked the desktop helper for the pin state while it was being rendered, and the helper waited for the render to finish. Status no longer waits, and the render never asks.
+- The midnight timer is set up once instead of on every pin.
+- The wallpaper image is written with light compression, so large screens are quicker.
+- The button says Pinning… or Unpinning… while it works.
+
 ## 1.1.4
 
 - Pin to desktop follows the real state. The page asks the desktop helper again when it comes back into view and every 12 seconds while visible, so unpinning from the bar, the key bind, or the timer shows up right away.
