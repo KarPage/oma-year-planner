@@ -62,7 +62,7 @@ Left-click the bar icon for a small menu: open the planner, pin or unpin, full s
 
 While it is pinned, the picture is painted again at midnight, and again when the planner window closes.
 
-The page is a local file, so it cannot run the pin command itself. `./open` starts a helper that listens only on `127.0.0.1:47321`.
+The page is a local file, so it cannot run the pin command itself. `./open` starts a helper that listens only on `127.0.0.1:47321`. Every request needs a secret token that the helper keeps in a private file under `$XDG_RUNTIME_DIR`; `./open` passes it to the page in the URL fragment. Pages without it get 403, even from a local file.
 
 It needs Chromium and ImageMagick (`magick`). Pinning saves your wallpaper path and the pictures in `~/.local/state/oma-year`, and adds a user timer, `~/.config/systemd/user/oma-year-wallpaper.{service,timer}`, for the midnight repaint. To draw your plans, it copies Chromium's local storage into a temporary folder, takes the picture there, and deletes the copy.
 
