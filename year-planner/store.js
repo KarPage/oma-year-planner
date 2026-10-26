@@ -809,7 +809,7 @@ function unescapeIcs(text) {
 }
 
 function plansToIcs(list) {
-  var lines = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Year Planner//EN", "CALSCALE:GREGORIAN"];
+  var lines = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Oma Year Planner//EN", "CALSCALE:GREGORIAN"];
   list.forEach(function (plan) {
     lines.push("BEGIN:VEVENT");
     lines.push("UID:" + plan.id + "@year-planner");

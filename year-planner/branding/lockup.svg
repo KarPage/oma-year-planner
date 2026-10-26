@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 400" width="1200" height="400">
+  <rect width="1200" height="400" fill="#000d04"/>
+  <image href="icon.svg" x="60" y="56" width="288" height="288"/>
+  <text x="400" y="200" font-family="Inter, 'Helvetica Neue', Arial, sans-serif" font-weight="700" font-size="104" fill="#fcfff4" letter-spacing="-2">Oma Year</text>
+  <text x="404" y="268" font-family="'JetBrains Mono', 'DejaVu Sans Mono', monospace" font-size="38" fill="#41a468" letter-spacing="6">PLANNER · CALENDAR</text>
+</svg>
