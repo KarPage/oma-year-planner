@@ -19,6 +19,8 @@
 - **Backup and calendar files.** Export and import JSON backups, with or without images, and `.ics` calendar files.
 - **Matches your Omarchy theme.** The planner reads the colors from your active theme each time it opens.
 - **Bar button.** Left-click opens the planner. Right-click pins the board on the wallpaper, or puts your wallpaper back.
+- **Wallpaper mode.** A still picture of your year, laid over your wallpaper and painted again at midnight.
+- **Google Calendar, if you want it.** Optional and read-only. It is off by default. You bring your own Google OAuth client id and run `./serve`. See [year-planner/README.md](year-planner/README.md#google-calendar).
 
 ## Privacy
 
@@ -26,8 +28,9 @@ Everything stays on your machine.
 
 - Plans and notes are saved in your browser's `localStorage`, and images in IndexedDB.
 - No server, no account, no analytics, and no tracking.
-- The page loads no fonts, scripts or images from the network.
+- The page makes no network requests unless you connect Google Calendar. Then events come straight from Google to your browser, read-only. Nothing is sent back.
 - Data leaves your device only when you export a file yourself.
+- Wallpaper mode copies Chromium's local storage into a temporary folder so the picture can show your plans. It takes the picture there and deletes the copy.
 
 ## Install as an Omarchy plugin
 
@@ -37,12 +40,22 @@ omarchy plugin add https://github.com/KarPage/oma-year-planner --enable
 
 This adds a calendar button to your bar. Left-click opens the planner in its own app window, themed with your current Omarchy colors. Right-click pins the board onto the wallpaper, or restores your wallpaper. If the button doesn't show up, add **Oma Year Planner** to the bar from the bar settings.
 
-You need Chromium (it ships with Omarchy) and Python 3 for the theme sync.
+You need Chromium (it ships with Omarchy), Python 3 for the theme sync, and ImageMagick (`magick`) for wallpaper mode.
 
 ### Remove the plugin
 
+If the board is pinned, right-click the bar button first to put your wallpaper back. Then:
+
 ```sh
 omarchy plugin remove io.github.karpage.oma-year
+```
+
+If you ever used wallpaper mode, remove its timer and saved state too:
+
+```sh
+systemctl --user disable --now oma-year-wallpaper.timer
+rm -f ~/.config/systemd/user/oma-year-wallpaper.service ~/.config/systemd/user/oma-year-wallpaper.timer
+rm -rf ~/.local/state/oma-year
 ```
 
 Your plans are saved in Chromium, not in the plugin folder, so removing the plugin doesn't delete them. Export a backup first (**Export backup** in the footer) if you want a copy. To clear them, clear the planner's site data in Chromium.
@@ -71,6 +84,8 @@ A still picture of the board, laid over the desktop. Nothing on it clicks or mov
 
 Right-click the bar button to toggle it. While it is pinned, the picture is painted again at midnight, and again when the planner window closes.
 
+Pinning changes your wallpaper with `omarchy-theme-bg-set` and puts it back when you unpin. It keeps the saved wallpaper path and pictures in `~/.local/state/oma-year`, and adds a user timer, `~/.config/systemd/user/oma-year-wallpaper.{service,timer}`, for the midnight repaint.
+
 To install it as an offline app (PWA), serve the folder and open it in Chromium:
 
 ```sh
@@ -83,7 +98,7 @@ You can also just open `year-planner/index.html` in any modern browser.
 
 To remove a clone, delete the `oma-year-planner` folder, and remove any launcher entry with *Remove › Web App* or `omarchy-webapp-remove`.
 
-Nothing is installed system-wide, and no Omarchy config files are changed.
+Nothing is installed system-wide, and no Omarchy config files are changed. Wallpaper mode, only when you use it, sets the wallpaper and adds the user timer above. The removal steps above undo it.
 
 ## Tests
 
@@ -106,10 +121,6 @@ oma-year-planner/
     ├── wallpaper     # pin the board on the desktop
     └── serve         # local server for the offline app
 ```
-
-## Roadmap
-
-- Optional read-only Google Calendar overlay. It would run in the browser only, with the `calendar.readonly` scope, no server, and no stored refresh tokens.
 
 ## License
 
