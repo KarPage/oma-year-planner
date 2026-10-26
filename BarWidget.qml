@@ -47,6 +47,17 @@ BarWidget {
 
   Component.onCompleted: checkAll()
 
+  // The wallpaper script rewrites this file on every pin, unpin, or refresh,
+  // wherever it was started from (this menu, the page, the key bind, or the
+  // midnight timer). Re-read the state as soon as it changes.
+  readonly property string stateDir: (Quickshell.env("XDG_STATE_HOME") || (Quickshell.env("HOME") + "/.local/state")) + "/oma-year"
+  FileView {
+    path: root.stateDir + "/changed"
+    watchChanges: true
+    printErrors: false
+    onFileChanged: { reload(); root.checkAll() }
+  }
+
   Process {
     id: pinProc
     command: [root.wallpaper, "status"]
