@@ -34,6 +34,7 @@ function renderChrome() {
   renderRhythm();
   renderRangeNote();
   statsEl.replaceChildren();
+  if (typeof paintGcal === "function") paintGcal();
   figures.forEach(function (pair) {
     var item = document.createElement("div");
     item.className = "stat-box";
@@ -381,6 +382,18 @@ function buildGrid() {
   board.replaceChildren(calendar);
 }
 
+function googleMark() {
+  var svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("class", "g-mark");
+  svg.setAttribute("viewBox", "0 0 16 16");
+  svg.setAttribute("aria-hidden", "true");
+  var path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+  path.setAttribute("fill", "currentColor");
+  path.setAttribute("d", "M8 1.6a6.4 6.4 0 1 0 5.7 9.2H8.1V8.2h6.6A6.4 6.4 0 0 0 8 1.6z");
+  svg.appendChild(path);
+  return svg;
+}
+
 function singleStackHeight(count) {
   return Planner.singleMarkerReserve(count);
 }
@@ -459,11 +472,15 @@ function syncBars() {
     var planEnd = Planner.parse(plan.end);
     var atStart = planStart && planStart.y === bar.y && planStart.m === bar.month && planStart.d === bar.startDay;
     var atEnd = planEnd && planEnd.y === bar.y && planEnd.m === bar.month && planEnd.d === bar.endDay;
-    if (atStart) fill.append(handle("w"));
-    if (atEnd) fill.append(handle("e"));
-    if (!tooled[plan.id]) {
+    if (plan.source !== "gcal" && atStart) fill.append(handle("w"));
+    if (plan.source !== "gcal" && atEnd) fill.append(handle("e"));
+    if (plan.source !== "gcal" && !tooled[plan.id]) {
       tooled[plan.id] = true;
       fill.append(planTools(plan));
+    }
+    if (plan.source === "gcal") {
+      el.classList.add("is-gcal");
+      fill.insertBefore(googleMark(), fill.firstChild);
     }
     el.append(fill);
     calendar.append(el);
@@ -497,6 +514,10 @@ function syncBars() {
       cap.className = "mark-label";
       cap.textContent = plan.title;
       tick.append(mark, cap);
+      if (plan.source === "gcal") {
+        tick.classList.add("is-gcal");
+        tick.append(googleMark());
+      }
       calendar.append(tick);
     }
     if (segs.length > 3) {

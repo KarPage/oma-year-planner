@@ -255,9 +255,34 @@ function openQuickEdit(id, returnEl) {
   quickId = id;
   quickReturn = returnEl || null;
   quickEdit.hidden = false;
+  var locked = plan.source === "gcal";
+  quickEdit.classList.toggle("is-gcal", locked);
+  qeName.readOnly = locked;
   qeName.value = plan.title;
-  paintQuickTypes(plan);
-  paintQuickSwatches(plan);
+  document.getElementById("qe-types").hidden = locked;
+  document.getElementById("qe-swatches").hidden = locked;
+  document.getElementById("qe-delete").hidden = locked;
+  var gcalNote = document.getElementById("qe-gcal");
+  var gcalLink = document.getElementById("qe-gcal-link");
+  var tip = quickEdit.querySelector(".qe-tip");
+  if (gcalNote) {
+    gcalNote.hidden = !locked;
+    gcalNote.textContent = locked ? "From Google Calendar, edit it there." : "";
+  }
+  if (gcalLink) {
+    if (locked && plan.htmlLink) {
+      gcalLink.hidden = false;
+      gcalLink.href = plan.htmlLink;
+    } else {
+      gcalLink.hidden = true;
+      gcalLink.removeAttribute("href");
+    }
+  }
+  if (tip) tip.hidden = locked;
+  if (!locked) {
+    paintQuickTypes(plan);
+    paintQuickSwatches(plan);
+  }
   var mark = board.querySelector('.bar.single[data-id="' + CSS.escape(id) + '"]');
   var anchor = mark || returnEl;
   var box = anchor && anchor.getBoundingClientRect ? anchor.getBoundingClientRect() : { left: 16, top: 16, bottom: 32 };
@@ -268,13 +293,17 @@ function openQuickEdit(id, returnEl) {
     fallbackWidth: 260,
     fallbackHeight: 160
   });
-  qeName.focus();
-  qeName.select();
+  if (locked) {
+    focusNoScroll(gcalLink && !gcalLink.hidden ? gcalLink : quickEdit);
+  } else {
+    qeName.focus();
+    qeName.select();
+  }
 }
 
 function saveQuick(patch) {
   var plan = planById(quickId);
-  if (!plan) return;
+  if (!plan || plan.source === "gcal") return;
   var title = patch && patch.title != null ? String(patch.title).trim() : plan.title;
   if (!title) return;
   var color = patch && patch.color ? patch.color : plan.color;

@@ -137,6 +137,7 @@ function armClock() {
     if (document.hidden) return;
     renderRhythm();
     refreshToday();
+    if (typeof gcalOnMinute === "function") gcalOnMinute();
   }, 60000);
   var now = new Date();
   var nextMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
@@ -188,6 +189,7 @@ function boot() {
   try {
     if (!savedPlanCount() && localStorage.getItem(WELCOME_KEY) !== "1") openHelp("welcome");
   } catch (err) { /* private mode */ }
+  if (typeof gcalOnBoot === "function") gcalOnBoot();
 }
 hydrateImages().then(boot, boot);
 setTimeout(boot, 800);

@@ -4,7 +4,7 @@ function onBarDown(event) {
   event.stopPropagation();
   var bar = event.target.closest(".bar");
   var plan = planById(bar.dataset.id);
-  if (!plan) return;
+  if (!plan || plan.source === "gcal") return;
   var resize = event.target.dataset && event.target.dataset.resize;
   gesture = {
     kind: "plan",
@@ -149,7 +149,7 @@ function onPointerUp(event) {
 
 function applyDates(id, start, end) {
   var plan = planById(id);
-  if (!plan) return;
+  if (!plan || plan.source === "gcal") return;
   var normalized = Planner.makePlan(plan, { start: start, end: end });
   if (!normalized) {
     setStatus("That date is not a real day.");
@@ -407,18 +407,41 @@ function openEditor(plan, defaults, focusNote) {
   renderChecks();
   renderDraftImages();
   paintEditorSwatches();
-  deleteBtn.hidden = !plan;
-  document.getElementById("editor-title").textContent = plan ? "Edit plan" : "Add plan";
-  dialog.classList.remove("anchored");
-  dialog.style.left = "";
-  dialog.style.top = "";
+  var locked = !!(plan && plan.source === "gcal");
+  setEditorLocked(locked, plan);
+  deleteBtn.hidden = !plan || locked;
+  document.getElementById("editor-title").textContent = locked ? "Google Calendar" : (plan ? "Edit plan" : "Add plan");
   dialog.showModal();
-  if (focusNote && plan && !document.getElementById("sec-note").hidden) {
+  if (locked) {
+    var closer = document.getElementById("f-cancel");
+    if (closer) closer.focus();
+  } else if (focusNote && plan && !document.getElementById("sec-note").hidden) {
     noteInput.focus();
   } else {
     titleInput.focus();
     titleInput.select();
   }
+}
+
+function setEditorLocked(locked, plan) {
+  dialog.classList.toggle("is-gcal", locked);
+  [titleInput, noteInput].forEach(function (el) { el.readOnly = locked; });
+  [startInput, endInput, colorInput].forEach(function (el) { el.disabled = locked; });
+  document.getElementById("span-single").disabled = locked;
+  document.getElementById("span-trip").disabled = locked;
+  document.querySelectorAll(".type-btn").forEach(function (button) { button.disabled = locked; });
+  document.getElementById("add-note").hidden = locked;
+  document.getElementById("add-check").hidden = locked;
+  document.getElementById("add-image").hidden = locked;
+  document.querySelectorAll("#f-swatches button").forEach(function (button) { button.disabled = locked; });
+  document.getElementById("f-save").hidden = locked;
+  document.getElementById("gcal-note").hidden = !locked;
+  var linkWrap = document.getElementById("gcal-open");
+  var link = document.getElementById("gcal-link");
+  var href = locked && plan && plan.htmlLink ? plan.htmlLink : "";
+  linkWrap.hidden = !href;
+  if (href) link.href = href;
+  else link.removeAttribute("href");
 }
 
 function closeEditor() {
@@ -522,6 +545,10 @@ imageInput.addEventListener("change", function () {
 
 form.addEventListener("submit", function (event) {
   event.preventDefault();
+  if (editingId) {
+    var current = planById(editingId);
+    if (current && current.source === "gcal") return;
+  }
   if (spanMode === "single") endInput.value = startInput.value;
   if (endInput.value && endInput.value < startInput.value) endInput.value = startInput.value;
   var normalized = Planner.makePlan(null, {
@@ -566,6 +593,10 @@ form.addEventListener("submit", function (event) {
 function deletePlan(id) {
   var plan = planById(id);
   if (!plan) return;
+  if (plan.source === "gcal") {
+    setStatus("That plan comes from Google Calendar. Disconnect to remove it.");
+    return;
+  }
   commitEdit(function () {
     plans = plans.filter(function (item) { return item.id !== id; });
     if (selectedId === id) selectedId = null;

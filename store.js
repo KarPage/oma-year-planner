@@ -74,17 +74,8 @@ function load() {
     /* fall through to the sample year */
   }
   return Planner.SAMPLE.map(function (plan) {
-    return {
-      id: plan.id,
-      title: plan.title,
-      tag: plan.tag,
-      color: plan.color,
-      note: plan.note || "",
-      images: plan.images || [],
-      start: plan.start,
-      end: plan.end
-    };
-  });
+    return Planner.makePlan(plan);
+  }).filter(Boolean);
 }
 
 var IMAGE_DB = "year-planner";
@@ -103,7 +94,18 @@ function storedPlan(plan) {
   };
   if (plan.type) stored.type = plan.type;
   if (plan.checklist && plan.checklist.length) stored.checklist = plan.checklist;
+  copyGcal(stored, plan);
   return stored;
+}
+
+function copyGcal(target, plan) {
+  if (!plan) return target;
+  if (plan.source === "gcal") target.source = "gcal";
+  if (plan.gcalId) target.gcalId = plan.gcalId;
+  if (plan.etag) target.etag = plan.etag;
+  if (plan.htmlLink) target.htmlLink = plan.htmlLink;
+  if (plan.gcalCal) target.gcalCal = plan.gcalCal;
+  return target;
 }
 
 function cleanImages(list) {
@@ -297,7 +299,7 @@ function paintUndo() {
 }
 
 function planMeta(plan) {
-  return {
+  var meta = {
     id: plan.id,
     title: plan.title,
     tag: plan.tag,
@@ -306,6 +308,10 @@ function planMeta(plan) {
     start: plan.start,
     end: plan.end
   };
+  if (plan.type) meta.type = plan.type;
+  if (plan.checklist && plan.checklist.length) meta.checklist = plan.checklist;
+  copyGcal(meta, plan);
+  return meta;
 }
 
 function remember() {
@@ -324,7 +330,7 @@ function plansFromSnapshot(list) {
   return list.map(function (plan) {
     var copy = planMeta(plan);
     copy.images = imagesById[plan.id] ? imagesById[plan.id].slice() : [];
-    return copy;
+    return Planner.makePlan(copy) || copy;
   });
 }
 
@@ -344,9 +350,12 @@ function undo() {
   noteShownFor = null;
   noteCard.hidden = true;
   noteCard.replaceChildren();
+  var metaNow = snap.gcalMeta && typeof gcalReadMeta === "function" ? gcalReadMeta() : null;
+  if (snap.gcalMeta && typeof gcalRestoreMeta === "function") gcalRestoreMeta(snap.gcalMeta);
   save().then(function (stored) {
     if (!stored) {
       restoreState(before);
+      if (metaNow && typeof gcalRestoreMeta === "function") gcalRestoreMeta(metaNow);
       undoStack.push(snap);
       paintUndo();
       setStatus("Couldn't store the plans in this browser. Export a backup to keep them.");
@@ -618,6 +627,11 @@ document.addEventListener("keydown", function (event) {
     }
   } else if ((event.key === "Delete" || event.key === "Backspace") && selectedId) {
     event.preventDefault();
+    var doomed = planById(selectedId);
+    if (doomed && doomed.source === "gcal") {
+      setStatus("That plan comes from Google Calendar. Disconnect to remove it.");
+      return;
+    }
     deletePlan(selectedId);
   } else if (event.key === "/") {
     event.preventDefault();
@@ -672,6 +686,15 @@ board.addEventListener("click", function (event) {
     openDayList(more.dataset.date, more);
     return;
   }
+  var span = event.target.closest && event.target.closest(".bar");
+  if (span && !span.classList.contains("single")) {
+    var whole = planById(span.dataset.id);
+    if (whole && whole.source === "gcal") {
+      event.preventDefault();
+      openEditor(whole);
+      return;
+    }
+  }
   onCellClick(event);
 });
 board.addEventListener("dblclick", function (event) {
@@ -691,6 +714,8 @@ board.addEventListener("pointerdown", function (event) {
   if (event.target.closest && event.target.closest("[data-act], .plan-tools, #day-list, #quick-edit")) return;
   var singleMark = event.target.closest && event.target.closest(".bar.single");
   if (singleMark) {
+    var singlePlan = planById(singleMark.dataset.id);
+    if (singlePlan && singlePlan.source === "gcal") return;
     gesture = {
       kind: "plan",
       mode: "move",

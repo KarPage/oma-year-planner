@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Optional read-only Google Calendar connect. Events stay in this browser. Disconnect removes them.
+
 ## 1.0.0
 
 - Scrolling year board with trips, events, and reminders.

@@ -53,6 +53,11 @@
         </svg>
       </button>
       <button class="icon-btn" id="help-btn" type="button" aria-label="Help">?</button>
+      <button class="ghost" id="gcal-connect" type="button" hidden>
+        <svg class="g-mark" viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M8 1.6a6.4 6.4 0 1 0 5.7 9.2H8.1V8.2h6.6A6.4 6.4 0 0 0 8 1.6z"/></svg>
+        <span>Connect Google Calendar</span>
+      </button>
+      <button class="ghost gcal-chip" id="gcal-reconnect" type="button" hidden>Reconnect Google</button>
     </div>
     <button class="primary" id="add" type="button">+ Add plan</button>
   </header>
@@ -60,6 +65,15 @@
   <section class="intro" aria-label="Overview">
     <div class="dash">
       <div class="stats" id="stats"></div>
+      <button class="stat-box gcal-tile" id="gcal-tile" type="button" hidden>
+        <span class="gcal-row">
+          <svg class="g-mark" viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M8 1.6a6.4 6.4 0 1 0 5.7 9.2H8.1V8.2h6.6A6.4 6.4 0 0 0 8 1.6z"/></svg>
+          <span class="gcal-email" id="gcal-email"></span>
+          <span class="gcal-dot" id="gcal-dot" hidden></span>
+        </span>
+        <span class="gcal-cals" id="gcal-cals" hidden></span>
+        <span class="gcal-caption" id="gcal-caption">Connect Google</span>
+      </button>
       <div class="dash-rhythm" id="rhythm" aria-label="Next and last plans"></div>
       <div class="dash-extra" id="dash-extra"></div>
       <label class="search">
@@ -120,6 +134,7 @@
     <form method="dialog">
       <h2 id="help-title">How it works</h2>
       <p class="help-sub">Your whole year at a glance.</p>
+      <p class="help-gcal">Google Calendar is optional and read-only. Events come straight from Google to this browser. Nothing is sent back. Disconnect removes them.</p>
       <div class="help-cards" id="help-cards">
         <article class="help-card">
           <div class="mini mini-drag" aria-hidden="true"><span></span><span></span><span class="on"></span><span class="on"></span><span class="on"></span><span></span><i class="cursor"></i></div>
@@ -210,7 +225,7 @@
       <div class="form-actions">
         <button class="ghost" value="cancel">Cancel</button>
         <button class="ghost" value="without">Without images</button>
-        <button class="primary" value="with">With images</button>
+        <button class="primary" value="with" autofocus>With images</button>
       </div>
     </form>
   </dialog>
@@ -230,6 +245,8 @@
   <dialog id="editor">
     <form id="editor-form">
       <h3 id="editor-title">Add plan</h3>
+      <p class="gcal-note" id="gcal-note" hidden>From Google Calendar, edit it there.</p>
+      <p class="gcal-open" id="gcal-open" hidden><a id="gcal-link" target="_blank" rel="noopener noreferrer">Open in Google Calendar</a></p>
       <label>Name
         <input id="f-title" type="text" maxlength="200" required placeholder="Plan name">
       </label>
@@ -276,7 +293,7 @@
       <div class="form-actions">
         <button class="danger" id="f-delete" type="button" hidden>Delete</button>
         <button class="ghost" id="f-cancel" type="button">Cancel</button>
-        <button class="primary" type="submit">Save</button>
+        <button class="primary" id="f-save" type="submit">Save</button>
       </div>
     </form>
   </dialog>
@@ -293,15 +310,20 @@
       <button class="danger" id="qe-delete" type="button">Delete</button>
       <button class="ghost" id="qe-more" type="button">More...</button>
     </div>
+    <p class="qe-gcal" id="qe-gcal" hidden></p>
+    <a class="qe-gcal-link" id="qe-gcal-link" target="_blank" rel="noopener noreferrer" hidden>Open in Google Calendar</a>
     <p class="qe-tip">Tip: drag the marker to another day to move it.</p>
   </div>
+  <div class="away-pop" id="gcal-pop" hidden role="dialog" aria-modal="true" aria-label="Google Calendar" tabindex="-1"></div>
 
   <script defer src="version.js"></script>
+  <script defer src="config.js"></script>
   <script defer src="planner.js"></script>
   <script defer src="store.js"></script>
   <script defer src="board.js"></script>
   <script defer src="popovers.js"></script>
   <script defer src="editor.js"></script>
+  <script defer src="gcal.js"></script>
   <script defer src="app.js"></script>
 </body>
 </html>
