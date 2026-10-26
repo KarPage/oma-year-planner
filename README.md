@@ -47,7 +47,7 @@ Everything stays on your machine.
 - The page makes no network requests unless you connect Google Calendar. Then events come straight from Google to your browser, read-only. Nothing is sent back.
 - Data leaves your device only when you export a file yourself.
 - Wallpaper mode copies Chromium's local storage into a temporary folder so the picture can show your plans. It takes the picture there and deletes the copy.
-- `./open` starts a small helper so the **Pin to desktop** button can work from a local file. It listens only on `127.0.0.1:47321` and accepts only pin, unpin, toggle and status. It only answers requests that carry a secret token, which `./open` hands to the planner page and which lives in a private file under `$XDG_RUNTIME_DIR`. Other pages, including other local files, get 403. It keeps running until you log out.
+- `./open` starts a small helper so the **Pin to desktop** button can work from a local file. It listens only on `127.0.0.1:47321` and accepts only pin, unpin, toggle and status. It only answers requests that carry a secret token, which lives in a private file under `$XDG_RUNTIME_DIR` and reaches the planner page through a private launcher page, never through a command line. Other pages, including other local files, get 403. It keeps running until you log out.
 
 ## Install as an Omarchy plugin
 
