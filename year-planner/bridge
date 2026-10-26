@@ -3,6 +3,7 @@
 
 A file:// page cannot run shell commands. ./open starts this on 127.0.0.1.
 It accepts only pin, unpin, toggle, and status, and it never reads a request body.
+The page must send Origin null (a local file) or the planner served on port 8080.
 """
 import json
 import os
@@ -14,7 +15,7 @@ ROOT = os.path.dirname(os.path.abspath(__file__))
 WALL = os.path.join(ROOT, "wallpaper")
 HOST = "127.0.0.1"
 PORT = 47321
-ACTIONS = {"pin", "unpin", "toggle", "status"}
+ALLOWED = {"null", "http://localhost:8080", "http://127.0.0.1:8080"}
 
 
 def pinned_now():
@@ -34,42 +35,69 @@ class Handler(BaseHTTPRequestHandler):
             return False
         return True
 
-    def send_json(self, code, payload):
+    def allowed_origin(self):
+        origin = self.headers.get("Origin")
+        if origin in ALLOWED:
+            return origin
+        return None
+
+    def forbid(self):
+        body = json.dumps({"error": "forbidden"}).encode()
+        self.send_response(403)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+        self.wfile.write(body)
+
+    def gate(self):
+        if not self.local_only():
+            return None
+        origin = self.allowed_origin()
+        if not origin:
+            self.forbid()
+            return None
+        return origin
+
+    def send_json(self, code, payload, origin):
         body = json.dumps(payload).encode()
         self.send_response(code)
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(body)))
-        self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Access-Control-Allow-Private-Network", "true")
+        self.send_header("Access-Control-Allow-Origin", origin)
+        self.send_header("Vary", "Origin")
         self.send_header("Cache-Control", "no-store")
         self.end_headers()
         self.wfile.write(body)
 
     def do_OPTIONS(self):
-        if not self.local_only():
+        origin = self.gate()
+        if not origin:
             return
         self.send_response(204)
-        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Origin", origin)
         self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
         self.send_header("Access-Control-Allow-Headers", "Content-Type")
-        self.send_header("Access-Control-Allow-Private-Network", "true")
+        self.send_header("Vary", "Origin")
         self.end_headers()
 
     def do_GET(self):
-        if not self.local_only():
+        origin = self.gate()
+        if not origin:
             return
         if self.path.split("?", 1)[0] != "/status":
-            self.send_json(404, {"error": "not found"})
+            self.send_json(404, {"error": "not found"}, origin)
             return
         pinned, code = pinned_now()
-        self.send_json(200 if code == 0 else 500, {"pinned": pinned})
+        self.send_json(200 if code == 0 else 500, {"pinned": pinned}, origin)
 
     def do_POST(self):
-        if not self.local_only():
+        origin = self.gate()
+        if not origin:
             return
         action = self.path.split("?", 1)[0].lstrip("/")
         if action not in ("pin", "unpin", "toggle"):
-            self.send_json(404, {"error": "not found"})
+            self.send_json(404, {"error": "not found"}, origin)
             return
         # Discard any body. The action comes only from the path.
         length = int(self.headers.get("Content-Length") or 0)
@@ -78,9 +106,9 @@ class Handler(BaseHTTPRequestHandler):
         result = subprocess.run([WALL, action], capture_output=True, text=True, timeout=180)
         pinned, _code = pinned_now()
         if result.returncode != 0:
-            self.send_json(500, {"pinned": pinned, "error": "failed"})
+            self.send_json(500, {"pinned": pinned, "error": "failed"}, origin)
             return
-        self.send_json(200, {"pinned": pinned})
+        self.send_json(200, {"pinned": pinned}, origin)
 
 
 def main():

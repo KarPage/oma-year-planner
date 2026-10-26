@@ -25,6 +25,12 @@ var imageList = document.getElementById("f-images");
 var noteCard = document.getElementById("note-card");
 var startInput = document.getElementById("f-start");
 var endInput = document.getElementById("f-end");
+var allDayBtn = document.getElementById("all-day");
+var timeFields = document.getElementById("time-fields");
+var timeInput = document.getElementById("f-time");
+var endTimeInput = document.getElementById("f-end-time");
+var whereInput = document.getElementById("f-where");
+var mapsLink = document.getElementById("f-maps");
 var deleteBtn = document.getElementById("f-delete");
 var formError = document.getElementById("f-error");
 var rangeFloater = document.getElementById("range-floater");
@@ -91,6 +97,9 @@ function storedPlan(plan) {
     end: plan.end
   };
   if (plan.type) stored.type = plan.type;
+  if (plan.time) stored.time = plan.time;
+  if (plan.endTime) stored.endTime = plan.endTime;
+  if (plan.location) stored.location = plan.location;
   if (plan.checklist && plan.checklist.length) stored.checklist = plan.checklist;
   copyGcal(stored, plan);
   return stored;
@@ -568,6 +577,10 @@ document.addEventListener("keydown", function (event) {
   } else if (event.key === "w" || event.key === "W") {
     event.preventDefault();
     if (typeof togglePin === "function") togglePin();
+  } else if ((event.key === "f" || event.key === "F") && !event.ctrlKey && !event.metaKey && !event.altKey) {
+    if (event.repeat || document.querySelector("dialog[open]")) return;
+    event.preventDefault();
+    if (typeof toggleFullscreen === "function") toggleFullscreen();
   } else if (event.key === "[") {
     scrollToMonth(Math.max(RANGE_START, year - 1), 1, true);
   } else if (event.key === "]") {
@@ -835,8 +848,10 @@ function plansToIcs(list) {
     lines.push("BEGIN:VEVENT");
     lines.push("UID:" + plan.id + "@year-planner");
     lines.push("SUMMARY:" + escapeIcs(plan.title));
-    lines.push("DTSTART;VALUE=DATE:" + plan.start.replace(/-/g, ""));
-    lines.push("DTEND;VALUE=DATE:" + Planner.addDays(plan.end, 1).replace(/-/g, ""));
+    var bounds = Planner.icsBounds(plan);
+    lines.push(bounds.start);
+    lines.push(bounds.end);
+    if (plan.location) lines.push("LOCATION:" + escapeIcs(plan.location));
     if (plan.note) lines.push("DESCRIPTION:" + escapeIcs(plan.note));
     lines.push("END:VEVENT");
   });
@@ -853,9 +868,10 @@ function plansFromIcs(text) {
   blocks.forEach(function (block) {
     var body = block.split("END:VEVENT")[0];
     var summary = "";
-    var start = "";
-    var end = "";
+    var startLine = "";
+    var endLine = "";
     var note = "";
+    var where = "";
     var uid = "";
     body.split(/\r?\n/).forEach(function (line) {
       var cut = line.indexOf(":");
@@ -864,23 +880,22 @@ function plansFromIcs(text) {
       var value = line.slice(cut + 1).trim();
       if (key === "SUMMARY") summary = unescapeIcs(value);
       if (key === "DESCRIPTION") note = unescapeIcs(value);
+      if (key === "LOCATION") where = unescapeIcs(value);
       if (key === "UID") uid = value;
-      if (key === "DTSTART") start = value.replace(/[^0-9]/g, "").slice(0, 8);
-      if (key === "DTEND") end = value.replace(/[^0-9]/g, "").slice(0, 8);
+      if (key === "DTSTART") startLine = line.trim();
+      if (key === "DTEND") endLine = line.trim();
     });
-    if (start.length !== 8) { skipped += 1; return; }
-    var startIso = start.slice(0, 4) + "-" + start.slice(4, 6) + "-" + start.slice(6, 8);
-    var endIso = startIso;
-    if (end.length === 8) {
-      endIso = Planner.addDays(end.slice(0, 4) + "-" + end.slice(4, 6) + "-" + end.slice(6, 8), -1);
-      if (endIso < startIso) endIso = startIso;
-    }
+    var span = Planner.readIcsSpan(startLine, endLine);
+    if (!span) { skipped += 1; return; }
     var plan = Planner.makePlan(null, {
       id: uid ? uid.split("@")[0] : "",
       title: summary || "Plan",
       note: note,
-      start: startIso,
-      end: endIso
+      location: where,
+      time: span.time,
+      endTime: span.endTime,
+      start: span.start,
+      end: span.end
     });
     if (!plan) { skipped += 1; return; }
     if (!plan.id) plan.id = crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + next.length;

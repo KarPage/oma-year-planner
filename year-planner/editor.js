@@ -385,6 +385,32 @@ function renderChecks() {
   });
 }
 
+function clockField(text) {
+  var match = String(text || "").match(/^(\d{1,2}):(\d{2})$/);
+  if (!match) return "";
+  return ("0" + (+match[1] % 24)).slice(-2) + ":" + match[2];
+}
+
+function setAllDay(on) {
+  allDayBtn.setAttribute("aria-pressed", on ? "true" : "false");
+  timeFields.hidden = !!on;
+  if (on) {
+    timeInput.value = "";
+    endTimeInput.value = "";
+  }
+}
+
+function paintMapsLink() {
+  var text = whereInput.value.trim();
+  if (!text) {
+    mapsLink.hidden = true;
+    mapsLink.removeAttribute("href");
+    return;
+  }
+  mapsLink.hidden = false;
+  mapsLink.href = "https://maps.google.com/?q=" + encodeURIComponent(text);
+}
+
 function openEditor(plan, defaults, focusNote) {
   closeDayList();
   hideFloater();
@@ -399,6 +425,14 @@ function openEditor(plan, defaults, focusNote) {
   colorInput.value = plan && plan.color ? plan.color : defaultSwatch(nextType);
   startInput.value = start;
   endInput.value = end;
+  var hasClock = !!(plan && (plan.time || plan.endTime));
+  setAllDay(!hasClock);
+  if (hasClock) {
+    timeInput.value = clockField(plan.time);
+    endTimeInput.value = clockField(plan.endTime);
+  }
+  whereInput.value = plan && plan.location ? plan.location : "";
+  paintMapsLink();
   setSpanMode(start === end ? "single" : "trip");
   setDraftType(nextType);
   noteInput.value = plan && plan.note ? plan.note : "";
@@ -433,7 +467,9 @@ function openEditor(plan, defaults, focusNote) {
 function setEditorLocked(locked, plan) {
   dialog.classList.toggle("is-gcal", locked);
   [titleInput, noteInput].forEach(function (el) { el.readOnly = locked; });
-  [startInput, endInput, colorInput].forEach(function (el) { el.disabled = locked; });
+  [startInput, endInput, colorInput, allDayBtn, timeInput, endTimeInput, whereInput].forEach(function (el) {
+    el.disabled = locked;
+  });
   document.getElementById("span-single").disabled = locked;
   document.getElementById("span-trip").disabled = locked;
   document.querySelectorAll(".type-btn").forEach(function (button) { button.disabled = locked; });
@@ -484,6 +520,10 @@ document.querySelectorAll(".type-btn").forEach(function (button) {
 });
 startInput.addEventListener("change", updateDayCount);
 endInput.addEventListener("change", updateDayCount);
+allDayBtn.addEventListener("click", function () {
+  setAllDay(allDayBtn.getAttribute("aria-pressed") !== "true");
+});
+whereInput.addEventListener("input", paintMapsLink);
 colorInput.addEventListener("input", paintEditorSwatches);
 titleInput.addEventListener("keydown", function (event) {
   if (event.key === "Enter") {
@@ -564,6 +604,13 @@ form.addEventListener("submit", function (event) {
   }
   if (spanMode === "single") endInput.value = startInput.value;
   if (endInput.value && endInput.value < startInput.value) endInput.value = startInput.value;
+  var allDay = allDayBtn.getAttribute("aria-pressed") === "true";
+  var startClock = allDay ? "" : timeInput.value;
+  var endClock = allDay ? "" : endTimeInput.value;
+  if (!allDay && startInput.value && startInput.value === endInput.value && startClock && endClock && endClock < startClock) {
+    formError.textContent = "End time is before the start time.";
+    return;
+  }
   var normalized = Planner.makePlan(null, {
     id: editingId || (crypto.randomUUID ? crypto.randomUUID() : String(Date.now())),
     title: titleInput.value,
@@ -573,7 +620,10 @@ form.addEventListener("submit", function (event) {
     checklist: document.getElementById("sec-check").hidden ? [] : draftChecks,
     images: draftImages,
     start: startInput.value,
-    end: endInput.value
+    end: endInput.value,
+    time: startClock,
+    endTime: endClock,
+    location: whereInput.value
   });
   if (!normalized) {
     formError.textContent = "Give the plan a name and a real start and end date.";

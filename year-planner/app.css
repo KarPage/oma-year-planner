@@ -119,6 +119,27 @@ h1.today-headline {
   background: color-mix(in srgb, var(--fg) 8%, transparent);
 }
 
+.top-end {
+  justify-self: end;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+#full-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  line-height: 0;
+}
+#full-btn svg { display: block; }
+#full-btn .full-collapse { display: none; }
+#full-btn.is-full {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+#full-btn.is-full .full-expand { display: none; }
+#full-btn.is-full .full-collapse { display: block; }
 .primary {
   justify-self: end;
   height: 40px;
@@ -380,10 +401,22 @@ h1.today-headline {
 }
 .dash-event .row {
   display: flex;
+  flex-wrap: wrap;
   align-items: baseline;
-  gap: 8px;
+  gap: 2px 8px;
+  width: 100%;
   min-width: 0;
   max-width: 100%;
+}
+.dash-event .meta {
+  flex: 1 0 100%;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 500;
 }
 .dash-event .name {
   min-width: 0;
@@ -608,6 +641,12 @@ h1.today-headline {
   .last-line { display: none; }
   .last-cell { display: flex; }
 }
+html.is-full #rhythm .dash-group.is-up { display: none; }
+html.is-full #rhythm .dash-group.is-soon { display: flex; flex: 1.7 1 0; }
+html.is-full #rhythm .dash-group.is-next { flex: 1.15 1 0; }
+html.is-full #rhythm .dash-group.is-last { margin-left: 0; flex: 0 0 13rem; max-width: 13rem; }
+html.is-full .dash-event.last-line { display: none; }
+html.is-full .dash-event.last-cell { display: flex; }
 .range-note {
   margin: 0;
   padding: 3px 12px 4px;
@@ -1253,7 +1292,7 @@ dialog::backdrop { background: color-mix(in srgb, var(--bg-deep) 78%, transparen
 form { display: flex; flex-direction: column; gap: 22px; padding: 32px; }
 dialog h3 { margin: 0; font-size: 28px; letter-spacing: -0.03em; }
 label { display: flex; flex-direction: column; gap: 8px; font-size: 15px; color: var(--accent); }
-input[type="text"], input[type="date"] {
+input[type="text"], input[type="date"], input[type="time"] {
   height: 48px;
   border: 1px solid var(--line-strong);
   background: var(--bg-raised);
@@ -1262,6 +1301,33 @@ input[type="text"], input[type="date"] {
   font-size: 16px;
 }
 .dates { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+.when-row { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; }
+#all-day {
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--line-strong);
+  background: transparent;
+  color: var(--fg-dim);
+}
+#all-day[aria-pressed="true"] {
+  border-color: var(--accent);
+  color: var(--fg);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+.time-fields { display: flex; gap: 12px; flex: 1; min-width: 220px; }
+.time-fields[hidden] { display: none; }
+.time-fields label { flex: 1; min-width: 0; }
+.where-row { display: flex; align-items: center; gap: 8px; }
+.where-row input { flex: 1; min-width: 0; }
+#f-maps {
+  flex: none;
+  font-size: 13px;
+  font-weight: 650;
+  color: var(--accent);
+  text-decoration: none;
+}
+#f-maps[hidden] { display: none; }
+#f-maps:hover { text-decoration: underline; }
 input[type="color"] {
   width: 100%;
   height: 48px;

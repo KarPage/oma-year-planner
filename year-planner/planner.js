@@ -691,6 +691,8 @@ var Planner = (function () {
     var note = location && description ? location + "\n" + description : (location || description);
     var color = nearestSwatch(calendar && calendar.backgroundColor, palette);
     var clock = gcalClock(event.start);
+    var endClock = gcalClock(event.end);
+    if (endClock === "0:00") endClock = "";
     return normalize({
       id: "gcal-" + key,
       title: title,
@@ -699,6 +701,7 @@ var Planner = (function () {
       color: color,
       note: note,
       time: clock,
+      endTime: endClock,
       location: location,
       start: span.start,
       end: span.end,
@@ -838,11 +841,88 @@ var Planner = (function () {
     var link = gcalSafeLink(raw.htmlLink);
     if (link) plan.htmlLink = link;
     if (raw.gcalCal) plan.gcalCal = String(raw.gcalCal).slice(0, 320);
-    var when = String(raw.time || "").trim().slice(0, 8);
-    if (/^\d{1,2}:\d{2}$/.test(when)) plan.time = when;
+    var when = clockText(raw.time);
+    if (when) plan.time = when;
+    var until = clockText(raw.endTime);
+    if (until) plan.endTime = until;
     var place = String(raw.location || "").trim().slice(0, 120);
     if (place) plan.location = place;
     return plan;
+  }
+
+  function clockText(value) {
+    var match = String(value || "").trim().match(/^(\d{1,2}):(\d{2})$/);
+    if (!match) return "";
+    var hour = +match[1];
+    if (hour > 23 || +match[2] > 59) return "";
+    return String(hour) + ":" + match[2];
+  }
+
+  function icsClock(value) {
+    var text = clockText(value);
+    if (!text) return "";
+    var parts = text.split(":");
+    return (parts[0].length < 2 ? "0" : "") + parts[0] + parts[1] + "00";
+  }
+
+  /* All-day events use VALUE=DATE. Timed events use a local DTSTART/DTEND. */
+  function icsBounds(plan) {
+    var start = String(plan && plan.start || "");
+    var end = String(plan && plan.end || start);
+    var time = clockText(plan && plan.time);
+    var endTime = clockText(plan && plan.endTime);
+    if (!time && !endTime) {
+      return {
+        start: "DTSTART;VALUE=DATE:" + start.replace(/-/g, ""),
+        end: "DTEND;VALUE=DATE:" + addDays(end, 1).replace(/-/g, "")
+      };
+    }
+    var startClock = time || endTime;
+    var finishClock = endTime || time;
+    return {
+      start: "DTSTART:" + start.replace(/-/g, "") + "T" + icsClock(startClock),
+      end: "DTEND:" + end.replace(/-/g, "") + "T" + icsClock(finishClock)
+    };
+  }
+
+  function readIcsPoint(line) {
+    var text = String(line || "");
+    var cut = text.indexOf(":");
+    var head = cut >= 0 ? text.slice(0, cut) : "";
+    var value = cut >= 0 ? text.slice(cut + 1) : text;
+    var digits = value.replace(/[^0-9]/g, "");
+    if (digits.length < 8) return null;
+    var iso = digits.slice(0, 4) + "-" + digits.slice(4, 6) + "-" + digits.slice(6, 8);
+    if (!parse(iso)) return null;
+    var dateOnly = /VALUE=DATE/i.test(head) || digits.length < 12;
+    var time = "";
+    if (!dateOnly) time = String(+digits.slice(8, 10)) + ":" + digits.slice(10, 12);
+    return { iso: iso, time: time, dateOnly: dateOnly };
+  }
+
+  /* Date-only DTEND is the morning after the last day. A midnight time is the same. */
+  function readIcsSpan(startLine, endLine) {
+    var start = readIcsPoint(startLine);
+    if (!start) return null;
+    var end = endLine ? readIcsPoint(endLine) : null;
+    var endIso = start.iso;
+    var endTime = "";
+    if (end) {
+      endIso = end.iso;
+      if (end.dateOnly || end.time === "0:00") {
+        endIso = addDays(end.iso, -1);
+        if (!endIso || endIso < start.iso) endIso = start.iso;
+      } else {
+        endTime = end.time;
+      }
+    }
+    if (endIso < start.iso) endIso = start.iso;
+    return {
+      start: start.iso,
+      end: endIso,
+      time: start.dateOnly ? "" : start.time,
+      endTime: endTime
+    };
   }
 
   function makePlan(base, patch) {
@@ -870,6 +950,7 @@ var Planner = (function () {
       htmlLink: pick("htmlLink"),
       gcalCal: pick("gcalCal"),
       time: pick("time"),
+      endTime: pick("endTime"),
       location: pick("location")
     });
   }
@@ -1208,7 +1289,20 @@ var Planner = (function () {
     var mapped = gcalEventToPlan(flight, calendar);
     if (!mapped || mapped.type !== "Event" || mapped.title !== "Flight" || mapped.tag !== "Gmail") errors.push("gcal event");
     if (!mapped || mapped.note !== "SFO\nGate 12" || mapped.source !== "gcal" || mapped.gcalId !== "primary:e1") errors.push("gcal note");
-    if (!mapped || mapped.time !== "9:00" || mapped.location !== "SFO") errors.push("gcal when");
+    if (!mapped || mapped.time !== "9:00" || mapped.endTime !== "11:00" || mapped.location !== "SFO") errors.push("gcal when");
+    var allDayIcs = icsBounds({ start: "2026-11-03", end: "2026-11-03" });
+    if (allDayIcs.start !== "DTSTART;VALUE=DATE:20261103" || allDayIcs.end !== "DTEND;VALUE=DATE:20261104") {
+      errors.push("ics allday");
+    }
+    var timedIcs = icsBounds({ start: "2026-11-03", end: "2026-11-03", time: "9:00", endTime: "11:00" });
+    if (timedIcs.start !== "DTSTART:20261103T090000" || timedIcs.end !== "DTEND:20261103T110000") errors.push("ics timed");
+    var readTimed = readIcsSpan(timedIcs.start, timedIcs.end);
+    if (!readTimed || readTimed.time !== "9:00" || readTimed.endTime !== "11:00" || readTimed.end !== "2026-11-03") {
+      errors.push("ics read timed");
+    }
+    var readDay = readIcsSpan(allDayIcs.start, allDayIcs.end);
+    if (!readDay || readDay.start !== "2026-11-03" || readDay.end !== "2026-11-03" || readDay.time) errors.push("ics read day");
+    if (clockText("09:00") !== "9:00" || clockText("25:00")) errors.push("clock");
     if (!mapped || mapped.htmlLink.indexOf("https://www.google.com/calendar/") !== 0) errors.push("gcal link");
     var week = gcalEventToPlan({
       id: "trip",
@@ -1310,6 +1404,8 @@ var Planner = (function () {
     countTrips: countTrips,
     checklistProgress: checklistProgress,
     makePlan: makePlan,
+    icsBounds: icsBounds,
+    readIcsSpan: readIcsSpan,
     backupTooLarge: backupTooLarge,
     singleMarkerReserve: singleMarkerReserve,
     placeNear: placeNear,
