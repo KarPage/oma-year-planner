@@ -79,6 +79,8 @@ function togglePin() {
   if (pinBusy) return;
   pinBusy = true;
   if (button) button.disabled = true;
+  var label = document.getElementById("pin-desk-label");
+  if (label) label.textContent = button && button.getAttribute("aria-pressed") === "true" ? "Unpinning\u2026" : "Pinning\u2026";
   fetch(PIN_BRIDGE + "/toggle", { method: "POST" }).then(function (res) {
     if (!res.ok) throw new Error("pin");
     return res.json();
@@ -138,7 +140,8 @@ paintFullscreen();
 // the key bind, or the midnight timer. Ask the helper again whenever the page
 // comes back into view, and every 12 seconds while it is visible.
 function checkPin() {
-  if (pinBusy || document.hidden) return;
+  // The wallpaper render loads this page too. It must not ask the helper.
+  if (window.OMA_WALLPAPER || pinBusy || document.hidden) return;
   fetch(PIN_BRIDGE + "/status").then(function (res) {
     if (!res.ok) throw new Error("status");
     return res.json();

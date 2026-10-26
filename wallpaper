@@ -12,9 +12,15 @@ CURRENT=$STATE/current
 CHANGED=$STATE/changed
 
 mkdir -p "$STATE"
-exec 9>"$STATE/lock"
-flock -w 90 9
 [ -e "$CHANGED" ] || : > "$CHANGED"
+
+# Only commands that change the wallpaper take the lock. Status stays lock
+# free: the board page asks for it while it is being rendered, and waiting
+# on the lock there stalled every pin for 30 seconds.
+take_lock() {
+  exec 9>"$STATE/lock"
+  flock -w 90 9
+}
 
 mark_changed() {
   date +%s%N > "$CHANGED"
@@ -51,6 +57,12 @@ clear_state() {
 install_timer() {
   unit_dir=${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user
   mkdir -p "$unit_dir"
+  # Already set up for this copy of the planner: nothing to do.
+  if grep -qsF "ExecStart=$ROOT/wallpaper refresh" "$unit_dir/oma-year-wallpaper.service" \
+    && [ -f "$unit_dir/oma-year-wallpaper.timer" ] \
+    && [ -e "$unit_dir/timers.target.wants/oma-year-wallpaper.timer" ]; then
+    return 0
+  fi
   cat > "$unit_dir/oma-year-wallpaper.service" << EOF
 [Unit]
 Description=Refresh the pinned year-planner wallpaper
@@ -155,7 +167,7 @@ import pathlib, sys
 path = pathlib.Path(sys.argv[1])
 html = path.read_text()
 extra = """<link rel=\"stylesheet\" href=\"wallpaper.css\">
-<script>try{localStorage.setItem(\"year-planner/welcome\",\"1\")}catch(e){}</script>
+<script>window.OMA_WALLPAPER=true;try{localStorage.setItem(\"year-planner/welcome\",\"1\")}catch(e){}</script>
 """
 path.write_text(html.replace("</head>", extra + "</head>", 1))
 PY
@@ -190,7 +202,8 @@ PY
   out=$STATE/render-$stamp.png
   magick "$wall" -resize "${W}x${H}^" -gravity center -extent "${W}x${H}" \
     \( "$board" -resize "${BOARD_W}x${BOARD_H}!" -alpha set -channel A -evaluate set 78% +channel \) \
-    -gravity northwest -geometry "+${BOARD_X}+${BOARD_Y}" -composite "$out"
+    -gravity northwest -geometry "+${BOARD_X}+${BOARD_Y}" -composite \
+    -define png:compression-level=1 "$out"
   [ -s "$out" ] || die "composite failed"
 
   rm -rf "$work"
@@ -258,10 +271,10 @@ cmd_toggle() {
 }
 
 case ${1:-} in
-  pin) cmd_pin ;;
-  unpin) cmd_unpin ;;
-  toggle) cmd_toggle ;;
-  refresh) cmd_refresh ;;
+  pin) take_lock; cmd_pin ;;
+  unpin) take_lock; cmd_unpin ;;
+  toggle) take_lock; cmd_toggle ;;
+  refresh) take_lock; cmd_refresh ;;
   status) cmd_status ;;
   *)
     echo "Usage: ./wallpaper pin | unpin | toggle | refresh | status" >&2
