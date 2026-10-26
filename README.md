@@ -84,6 +84,12 @@ A still picture of the board, laid over the desktop. Nothing on it clicks or mov
 
 Right-click the bar button to toggle it. While it is pinned, the picture is painted again at midnight, and again when the planner window closes.
 
+Optional shortcut, so you can unpin when the planner is closed. Add it to `~/.config/hypr/yearplanner.lua` (the path is this plugin's `year-planner/wallpaper`):
+
+```lua
+o.bind("SUPER + SHIFT + Y", "Pin or unpin the year planner", "/path/to/year-planner/wallpaper toggle")
+```
+
 Pinning changes your wallpaper with `omarchy-theme-bg-set` and puts it back when you unpin. It keeps the saved wallpaper path and pictures in `~/.local/state/oma-year`, and adds a user timer, `~/.config/systemd/user/oma-year-wallpaper.{service,timer}`, for the midnight repaint.
 
 To install it as an offline app (PWA), serve the folder and open it in Chromium:

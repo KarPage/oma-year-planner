@@ -31,7 +31,7 @@ BarWidget {
     text: "\uf073"
     slotSize: Style.bar.iconSlot
     fontSize: Style.font.caption
-    tooltipText: "Oma Year Planner\nRight-click pins the wallpaper"
+    tooltipText: "Oma Year Planner. Right-click or Super+Shift+Y to pin/unpin desktop"
     onPressed: function(buttonCode) {
       if (buttonCode === Qt.LeftButton) root.openPlanner()
       else if (buttonCode === Qt.RightButton) root.toggleWallpaper()
