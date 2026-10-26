@@ -84,7 +84,7 @@ function gcalAccountEmail(calendars) {
 }
 
 function gcalPalette() {
-  var names = ["--travel", "--work", "--personal", "--other", "--accent", "--range"];
+  var names = ["--teal", "--sky", "--lavender", "--sand", "--rose", "--mint"];
   var list = [];
   names.forEach(function (name) {
     var value = "";

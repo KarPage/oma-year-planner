@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- The dashboard is four groups: counts, Next, Last, and a short Upcoming list.
+- Plan bars are glass. The editor palette is teal, sky, lavender, sand, rose, and mint.
 - Plan bars are solid, with a duration pill. One- and two-day plans are dots. The board scrollbar stays hidden.
 - Optional read-only Google Calendar connect. Events stay in this browser. Disconnect removes them.
 - Today centers the current month and day. The header keyboard button opens help.

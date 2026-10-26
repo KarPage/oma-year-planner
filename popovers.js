@@ -131,18 +131,27 @@ function themeSwatch(name) {
   return /^#[0-9a-fA-F]{6}$/.test(value) ? value.toLowerCase() : "";
 }
 
+var PLAN_SWATCHES = [
+  { name: "--teal", label: "Teal" },
+  { name: "--sky", label: "Sky" },
+  { name: "--lavender", label: "Lavender" },
+  { name: "--sand", label: "Sand" },
+  { name: "--rose", label: "Rose" },
+  { name: "--mint", label: "Mint" }
+];
+
 function paintQuickSwatches(plan) {
   var row = document.getElementById("qe-swatches");
   if (!row) return;
   row.replaceChildren();
-  ["--accent", "--travel", "--work", "--personal", "--other", "--range"].forEach(function (name) {
-    var hex = themeSwatch(name);
+  PLAN_SWATCHES.forEach(function (swatch) {
+    var hex = themeSwatch(swatch.name);
     if (!hex) return;
     var button = document.createElement("button");
     button.type = "button";
     button.className = "qe-swatch";
-    button.style.background = "var(" + name + ")";
-    button.setAttribute("aria-label", name.slice(2));
+    button.style.background = "var(" + swatch.name + ")";
+    button.setAttribute("aria-label", swatch.label);
     button.setAttribute("aria-pressed", plan.color === hex ? "true" : "false");
     button.addEventListener("click", function () {
       saveQuick({ color: hex });

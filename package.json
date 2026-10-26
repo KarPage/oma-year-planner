@@ -1,6 +1,6 @@
 {
   "name": "oma-year-planner",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "private": true,
   "description": "A scrolling year board for plans and trips. No build step and no dependencies.",
   "scripts": {

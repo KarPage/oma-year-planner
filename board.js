@@ -48,54 +48,59 @@ function renderChrome() {
   renderDashExtra(list);
 }
 
+function shortDate(iso) {
+  var parts = Planner.parse(iso);
+  if (!parts) return iso;
+  return Planner.MONTHS[parts.m - 1].slice(0, 3) + " " + parts.d;
+}
+
 function renderDashExtra(list) {
   var host = document.getElementById("dash-extra");
   if (!host) return;
+  host.className = "dash-group dash-up";
   host.replaceChildren();
-  var today = todayParts();
-  var from = today.y + "-" + Planner.pad(today.m) + "-01";
-  var to = today.y + "-" + Planner.pad(today.m) + "-" + Planner.pad(Planner.daysInMonth(today.y, today.m));
-  var month = list.filter(function (plan) { return plan.end >= from && plan.start <= to; });
-  var box = document.createElement("div");
-  box.className = "dash-month";
-  var cap = document.createElement("b");
-  cap.textContent = "This month";
-  var line = document.createElement("span");
-  line.textContent = Planner.countTrips(month) + " trips · " + Planner.monthDaysAway(list, today.y, today.m) + " days";
-  box.append(cap, line);
-  var up = document.createElement("div");
-  up.className = "dash-up";
   var label = document.createElement("span");
   label.className = "k";
   label.textContent = "Upcoming";
-  up.append(label);
+  host.append(label);
   var iso = todayIso();
   var next = list.filter(function (plan) { return plan.start >= iso; }).sort(function (a, b) {
     return a.start < b.start ? -1 : a.start > b.start ? 1 : 0;
   }).slice(0, 3);
   if (!next.length) {
     var empty = document.createElement("span");
+    empty.className = "dash-empty";
     empty.textContent = "Nothing coming up.";
-    up.append(empty);
-  } else {
-    var ol = document.createElement("ol");
-    next.forEach(function (plan) {
-      var li = document.createElement("li");
-      var button = document.createElement("button");
-      button.type = "button";
-      var name = document.createElement("span");
-      name.textContent = plan.title;
-      var when = document.createElement("span");
-      when.className = "when";
-      when.textContent = Planner.plural(Planner.diffDays(iso, plan.start), "day");
-      button.append(name, when);
-      button.addEventListener("click", function () { focusPlan(plan); });
-      li.append(button);
-      ol.append(li);
-    });
-    up.append(ol);
+    host.append(empty);
+    return;
   }
-  host.append(box, up);
+  var ol = document.createElement("ol");
+  next.forEach(function (plan) {
+    var li = document.createElement("li");
+    var button = document.createElement("button");
+    button.type = "button";
+    var when = document.createElement("span");
+    when.className = "when";
+    when.textContent = shortDate(plan.start);
+    var name = document.createElement("span");
+    name.className = "name";
+    name.textContent = plan.title;
+    var days = document.createElement("span");
+    days.className = "days";
+    var away = Planner.diffDays(iso, plan.start);
+    days.textContent = away === 0 ? "today" : Planner.plural(away, "day");
+    function sep() {
+      var mark = document.createElement("span");
+      mark.className = "sep";
+      mark.textContent = "·";
+      return mark;
+    }
+    button.append(when, sep(), name, sep(), days);
+    button.addEventListener("click", function () { focusPlan(plan); });
+    li.append(button);
+    ol.append(li);
+  });
+  host.append(ol);
 }
 
 function renderTodayTile() {
@@ -150,17 +155,25 @@ function dashEvent(which, plan, days, soon) {
   var caption = document.createElement("span");
   caption.className = "k";
   caption.textContent = which === "next" ? "Next" : "Last";
+  var row = document.createElement("span");
+  row.className = "row";
   var name = document.createElement("span");
   name.className = "name";
-  name.textContent = plan.title;
-  var num = document.createElement("span");
-  num.className = "num";
-  num.textContent = String(days);
-  var unit = document.createElement("span");
-  unit.className = "unit";
-  unit.textContent = (days === 1 ? "day" : "days") + (soon ? "" : " ago");
-  button.append(caption, name, num, unit);
-  button.title = (which === "next" ? "Next: " : "Last: ") + plan.title + " " + dayPhrase(days, soon);
+  name.textContent = plan ? plan.title : "None";
+  row.append(name);
+  if (plan) {
+    var num = document.createElement("b");
+    num.className = "num";
+    num.textContent = String(days);
+    var unit = document.createElement("span");
+    unit.className = "unit";
+    unit.textContent = soon ? (days === 1 ? "day" : "days") : (days === 1 ? "day ago" : "days ago");
+    row.append(num, unit);
+    button.title = (which === "next" ? "Next: " : "Last: ") + plan.title + " " + dayPhrase(days, soon);
+  } else {
+    button.disabled = true;
+  }
+  button.append(caption, row);
   return button;
 }
 
@@ -177,42 +190,16 @@ function renderRhythm() {
   var host = document.getElementById("rhythm");
   if (!host) return;
   host.replaceChildren();
-  var track = document.createElement("div");
-  track.className = "dash-track";
-  var set = document.createElement("div");
-  set.className = "dash-set";
-  if (!future && !past) {
-    var empty = document.createElement("p");
-    empty.className = "dash-empty";
-    empty.textContent = "No plans before or after today.";
-    set.append(empty);
-  } else {
-    if (future) set.append(dashEvent("next", future, Planner.diffDays(today, future.start), true));
-    if (past) set.append(dashEvent("last", past, Planner.diffDays(past.end, today), false));
-  }
-  track.append(set);
-  host.append(track);
-  requestAnimationFrame(fitMarquee);
+  var nextGroup = document.createElement("div");
+  nextGroup.className = "dash-group";
+  nextGroup.append(dashEvent("next", future, future ? Planner.diffDays(today, future.start) : 0, true));
+  var lastGroup = document.createElement("div");
+  lastGroup.className = "dash-group";
+  lastGroup.append(dashEvent("last", past, past ? Planner.diffDays(past.end, today) : 0, false));
+  host.append(nextGroup, lastGroup);
 }
 
-function fitMarquee() {
-  var host = document.getElementById("rhythm");
-  if (!host) return;
-  var track = host.querySelector(".dash-track");
-  var set = track && track.querySelector(".dash-set");
-  if (!track || !set) return;
-  track.querySelectorAll(".dash-set[data-clone]").forEach(function (node) { node.remove(); });
-  track.classList.remove("is-long");
-  var reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  if (reduce || set.querySelector(".dash-empty")) return;
-  if (track.scrollWidth <= host.clientWidth + 1) return;
-  var clone = set.cloneNode(true);
-  clone.setAttribute("data-clone", "1");
-  clone.setAttribute("aria-hidden", "true");
-  clone.querySelectorAll("button").forEach(function (button) { button.tabIndex = -1; });
-  track.append(clone);
-  track.classList.add("is-long");
-}
+function fitMarquee() {}
 
 function renderRangeNote() {
   var note = document.getElementById("range-note");
@@ -394,11 +381,6 @@ function googleMark() {
   return svg;
 }
 
-function themeHex(name) {
-  var value = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-  return /^#[0-9a-fA-F]{6}$/.test(value) ? value : "";
-}
-
 function syncBars() {
   var list = visible();
   var laid = Planner.layout(list, RANGE_START + "-01-01", RANGE_END + "-12-31");
@@ -411,25 +393,6 @@ function syncBars() {
     if (!groups[iso]) groups[iso] = [];
     groups[iso].push(seg);
   });
-  var themeInk = {
-    fg: themeHex("--fg") || "#fcfff4",
-    bg: themeHex("--bg") || "#000d04",
-    muted: themeHex("--muted"),
-    raised: themeHex("--bg-raised"),
-    sun: themeHex("--personal")
-  };
-  function inkFor(color, past) {
-    var which = Planner.barInk(color || "#74a869", themeInk.fg, themeInk.bg, {
-      muted: themeInk.muted,
-      raised: themeInk.raised,
-      sun: themeInk.sun,
-      past: !!past
-    });
-    return {
-      color: which === "bg" ? "var(--bg)" : "var(--fg)",
-      kind: which === "bg" ? "ink-dark" : "ink-light"
-    };
-  }
   var tooled = {};
   var today = todayIso();
   laid.bars.forEach(function (bar) {
@@ -446,8 +409,6 @@ function syncBars() {
     if (past) el.classList.add("is-past");
     if (span <= 2 && !bar.continuesBefore && !bar.continuesAfter) el.classList.add("is-brief");
     if (plan.id === selectedId) el.classList.add("selected");
-    var ink = inkFor(plan.color, past);
-    el.classList.add(ink.kind);
     el.style.setProperty("--cat", plan.color || "#74a869");
     var ym = bar.y + "-" + Planner.pad(bar.month);
     el.style.gridColumn = (bar.startDay + 1) + " / " + (bar.endDay + 2);
@@ -462,7 +423,6 @@ function syncBars() {
 
     var fill = document.createElement("span");
     fill.className = "fill";
-    fill.style.color = ink.color;
     if (bar.continuesBefore) {
       var before = document.createElement("span");
       before.className = "edge";
