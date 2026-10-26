@@ -577,6 +577,10 @@ document.addEventListener("keydown", function (event) {
   } else if (event.key === "w" || event.key === "W") {
     event.preventDefault();
     if (typeof togglePin === "function") togglePin();
+  } else if ((event.key === "f" || event.key === "F") && !event.ctrlKey && !event.metaKey && !event.altKey) {
+    if (event.repeat || document.querySelector("dialog[open]")) return;
+    event.preventDefault();
+    if (typeof toggleFullscreen === "function") toggleFullscreen();
   } else if (event.key === "[") {
     scrollToMonth(Math.max(RANGE_START, year - 1), 1, true);
   } else if (event.key === "]") {

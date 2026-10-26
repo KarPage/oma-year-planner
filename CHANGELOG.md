@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.1.2
+
+- Full screen sits just left of Add plan. F toggles it. Esc, or the window's own fullscreen key, keeps the icon in step. The wide dashboard is used while the page is full screen.
+
 ## 1.1.1
 
 - The desktop helper accepts only the planner page: a local file, or the page served at localhost port 8080. Any other origin is refused.

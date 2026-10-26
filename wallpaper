@@ -107,6 +107,7 @@ print("CSS_H=%d" % max(1, round(h / scale)))
   cat > "$app/wallpaper.css" << 'EOF'
 .nav,
 #add,
+#full-btn,
 .search,
 .foot,
 .action,

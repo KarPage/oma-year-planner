@@ -119,6 +119,27 @@ h1.today-headline {
   background: color-mix(in srgb, var(--fg) 8%, transparent);
 }
 
+.top-end {
+  justify-self: end;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+#full-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  line-height: 0;
+}
+#full-btn svg { display: block; }
+#full-btn .full-collapse { display: none; }
+#full-btn.is-full {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+#full-btn.is-full .full-expand { display: none; }
+#full-btn.is-full .full-collapse { display: block; }
 .primary {
   justify-self: end;
   height: 40px;
@@ -620,6 +641,12 @@ h1.today-headline {
   .last-line { display: none; }
   .last-cell { display: flex; }
 }
+html.is-full #rhythm .dash-group.is-up { display: none; }
+html.is-full #rhythm .dash-group.is-soon { display: flex; flex: 1.7 1 0; }
+html.is-full #rhythm .dash-group.is-next { flex: 1.15 1 0; }
+html.is-full #rhythm .dash-group.is-last { margin-left: 0; flex: 0 0 13rem; max-width: 13rem; }
+html.is-full .dash-event.last-line { display: none; }
+html.is-full .dash-event.last-cell { display: flex; }
 .range-note {
   margin: 0;
   padding: 3px 12px 4px;

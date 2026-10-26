@@ -98,6 +98,37 @@ function togglePin() {
 }
 
 document.getElementById("pin-desk").addEventListener("click", togglePin);
+
+function fullscreenOn() {
+  return !!document.fullscreenElement;
+}
+
+function paintFullscreen() {
+  var on = fullscreenOn();
+  var button = document.getElementById("full-btn");
+  document.documentElement.classList.toggle("is-full", on);
+  if (!button) return;
+  button.classList.toggle("is-full", on);
+  button.setAttribute("aria-pressed", on ? "true" : "false");
+  var label = on ? "Exit full screen (F)" : "Full screen (F)";
+  button.title = label;
+  button.setAttribute("aria-label", label);
+}
+
+function toggleFullscreen() {
+  if (fullscreenOn()) {
+    var leaving = document.exitFullscreen && document.exitFullscreen();
+    if (leaving && leaving.catch) leaving.catch(function () {});
+    return;
+  }
+  if (!document.documentElement.requestFullscreen) return;
+  var entering = document.documentElement.requestFullscreen();
+  if (entering && entering.catch) entering.catch(function () {});
+}
+
+document.getElementById("full-btn").addEventListener("click", toggleFullscreen);
+document.addEventListener("fullscreenchange", paintFullscreen);
+paintFullscreen();
 fetch(PIN_BRIDGE + "/status").then(function (res) {
   if (!res.ok) throw new Error("status");
   return res.json();
