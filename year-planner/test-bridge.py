@@ -6,6 +6,7 @@ Runs a private copy of ./bridge on a spare port with a fake wallpaper script
 and a temporary runtime folder, so the real desktop is never touched.
 """
 import http.client
+import json
 import os
 import socket
 import stat
@@ -114,9 +115,24 @@ def main():
         with open(fake, "w") as fh:
             fh.write('#!/bin/sh\necho "$1" >> "%s"\n[ "$1" = status ] && echo unpinned\nexit 0\n' % log)
         os.chmod(fake, 0o755)
+        fake_app = os.path.join(tmp, "app")
+        fs_flag = os.path.join(tmp, "fs")
+        with open(fake_app, "w") as fh:
+            fh.write(
+                "#!/bin/sh\n"
+                "flag=\"%s\"\n"
+                "if [ \"$1\" = fullscreen ]; then\n"
+                "  if [ -f \"$flag\" ]; then rm \"$flag\"; else touch \"$flag\"; fi\n"
+                "fi\n"
+                "if [ -f \"$flag\" ]; then echo \"windows=1 fullscreen=1 bridge=0\"\n"
+                "else echo \"windows=0 fullscreen=0 bridge=0\"\n"
+                "fi\n"
+                "exit 0\n" % fs_flag
+            )
+        os.chmod(fake_app, 0o755)
         port = free_port()
         env = dict(os.environ, XDG_RUNTIME_DIR=tmp, OMA_YEAR_BRIDGE_PORT=str(port),
-                   OMA_YEAR_WALLPAPER=fake, OMA_YEAR_LAUNCH_TTL="1")
+                   OMA_YEAR_WALLPAPER=fake, OMA_YEAR_APP=fake_app, OMA_YEAR_LAUNCH_TTL="1")
         out = subprocess.run([sys.executable, os.path.join(ROOT, "bridge"), "ensure"],
                              env=env, capture_output=True, text=True, timeout=10)
         folder = os.path.join(tmp, "oma-year-planner")
@@ -143,7 +159,8 @@ def main():
                 if status != code:
                     failures.append("%s: got %d, want %d" % (label, status, code))
 
-            for route, method in (("/toggle", "POST"), ("/pin", "POST"), ("/unpin", "POST"), ("/status", "GET")):
+            for route, method in (("/toggle", "POST"), ("/pin", "POST"), ("/unpin", "POST"),
+                                   ("/fullscreen", "POST"), ("/fullscreen", "GET"), ("/status", "GET")):
                 expect(403, method, route, {"Host": host, "Origin": "null"}, "no token " + route)
                 expect(403, method, route, {"Host": host, "Origin": "null", "X-Planner-Token": "0" * 64}, "wrong token " + route)
                 expect(403, method, route, {"Host": host, "Origin": "null", "X-Planner-Token": token[:-1]}, "short token " + route)
@@ -154,7 +171,24 @@ def main():
             expect(403, "PUT", "/toggle", good, "PUT")
             if os.path.exists(log) and any(line.strip() != "status" for line in open(log)):
                 failures.append("wallpaper ran an action without a valid token")
-            expect(200, "GET", "/status", good, "status with token")
+            status_code, status_body = call(port, "GET", "/status", good)
+            if status_code != 200:
+                failures.append("status with token: got %d" % status_code)
+            else:
+                try:
+                    payload = json.loads(status_body.decode())
+                except ValueError:
+                    payload = {}
+                if payload.get("fullscreen") is not False:
+                    failures.append("status fullscreen should start false")
+            expect(200, "POST", "/fullscreen", good, "fullscreen with token")
+            status_code, status_body = call(port, "GET", "/status", good)
+            try:
+                payload = json.loads(status_body.decode()) if status_code == 200 else {}
+            except ValueError:
+                payload = {}
+            if payload.get("fullscreen") is not True:
+                failures.append("fullscreen toggle did not stick")
             expect(200, "POST", "/toggle", good, "toggle with token")
             calls = [line.strip() for line in open(log)] if os.path.exists(log) else []
             if "toggle" not in calls:

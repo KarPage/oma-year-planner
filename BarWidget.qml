@@ -19,6 +19,7 @@ BarWidget {
   property bool pinned: false
   property bool running: false
   property bool fullscreen: false
+  property string barSide: ""
 
   implicitWidth: button.implicitWidth
   implicitHeight: button.implicitHeight
@@ -40,9 +41,15 @@ BarWidget {
     followUp.restart()
   }
 
+  function setBarSide(side) {
+    barSetProc.command = [pluginDir + "/year-planner/bar-position", side]
+    if (!barSetProc.running) barSetProc.running = true
+  }
+
   function checkAll() {
     if (!pinProc.running) pinProc.running = true
     if (!appProc.running) appProc.running = true
+    if (!barSideProc.running) barSideProc.running = true
   }
 
   Component.onCompleted: checkAll()
@@ -66,6 +73,28 @@ BarWidget {
         var first = text.trim().split("\n")[0]
         if (first === "pinned") root.pinned = true
         else if (first === "unpinned") root.pinned = false
+      }
+    }
+  }
+
+  Process {
+    id: barSideProc
+    command: [root.pluginDir + "/year-planner/bar-position", "status"]
+    stdout: StdioCollector {
+      onStreamFinished: {
+        var token = text.trim().split("\n")[0]
+        if (token === "left" || token === "center" || token === "right") root.barSide = token
+        else if (token === "unset") root.barSide = ""
+      }
+    }
+  }
+
+  Process {
+    id: barSetProc
+    stdout: StdioCollector {
+      onStreamFinished: {
+        var token = text.trim().split("\n")[0]
+        if (token === "left" || token === "center" || token === "right") root.barSide = token
       }
     }
   }

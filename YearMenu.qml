@@ -4,8 +4,9 @@ import Quickshell
 import qs.Commons
 import qs.Ui
 
-// The bar menu: open, pin, full screen, refresh, quit. Keys O W F R Q work
-// while it is open; arrows or j/k move, Enter runs, Esc closes.
+// The bar menu: open, pin, full screen, refresh, bar position, quit.
+// Keys O W F R Q run actions. 1 2 3 set the bar side. Arrows or j/k move,
+// Enter runs, Esc closes.
 Panel {
   id: panel
   moduleName: "io.github.karpage.oma-year"
@@ -149,6 +150,11 @@ Panel {
         if (panel.cursor >= 0 && panel.actions[panel.cursor].enabled) panel.run(panel.actions[panel.cursor].key)
       }
       onTextKey: function(t) {
+        var sideKeys = { "1": "left", "2": "center", "3": "right" }
+        if (sideKeys[t]) {
+          panel.widget.setBarSide(sideKeys[t])
+          return
+        }
         var keys = { "o": "open", "w": "pin", "f": "fullscreen", "r": "refresh", "q": "quit" }
         var key = keys[t.toLowerCase()]
         if (!key) return
@@ -219,6 +225,54 @@ Panel {
           hint: "F"
         }
         MenuRow { index: 3; glyph: "\uf021"; label: "Refresh desktop snapshot"; hint: "R" }
+
+        Item {
+          Layout.fillWidth: true
+          implicitHeight: Style.space(44)
+          Text {
+            x: Style.space(12)
+            anchors.verticalCenter: parent.verticalCenter
+            text: "Bar position"
+            color: panel.fg
+            font.family: panel.fontFamily
+            font.pixelSize: Style.font.bodySmall + 1
+          }
+          Row {
+            anchors.right: parent.right
+            anchors.rightMargin: Style.space(8)
+            anchors.verticalCenter: parent.verticalCenter
+            spacing: -1
+            Repeater {
+              model: [
+                { "side": "left", "label": "Left", "hint": "1" },
+                { "side": "center", "label": "Center", "hint": "2" },
+                { "side": "right", "label": "Right", "hint": "3" }
+              ]
+              delegate: Rectangle {
+                required property var modelData
+                width: Style.space(58)
+                height: Style.space(28)
+                radius: 0
+                border.width: 1
+                border.color: panel.widget.barSide === modelData.side ? panel.accent : Util.alpha(panel.fg, 0.45)
+                color: panel.widget.barSide === modelData.side ? panel.accent : "transparent"
+                Text {
+                  anchors.centerIn: parent
+                  text: modelData.label
+                  color: panel.widget.barSide === modelData.side ? "#04140c" : panel.fg
+                  font.family: panel.fontFamily
+                  font.pixelSize: Style.font.caption
+                  font.bold: panel.widget.barSide === modelData.side
+                }
+                MouseArea {
+                  anchors.fill: parent
+                  cursorShape: Qt.PointingHandCursor
+                  onClicked: panel.widget.setBarSide(modelData.side)
+                }
+              }
+            }
+          }
+        }
 
         Item { Layout.fillWidth: true; implicitHeight: Style.space(4) }
         Rectangle { Layout.fillWidth: true; implicitHeight: 1; color: Util.alpha(panel.fg, 0.12) }

@@ -163,10 +163,30 @@ function paintQuickSwatches(plan) {
   });
 }
 
+var awayKey = "";
+
+function paintAwayOpen() {
+  var open = awayPop && !awayPop.hidden;
+  board.querySelectorAll(".month-total, .away-head").forEach(function (node) {
+    var on = false;
+    if (!open) on = false;
+    else if (node.classList.contains("month-total")) on = !!awayKey && node.dataset.ym === awayKey;
+    else on = !awayKey;
+    node.classList.toggle("is-open", on);
+    node.setAttribute("aria-expanded", on ? "true" : "false");
+  });
+}
+
 function closeAwayPop(restore) {
-  if (!awayPop || awayPop.hidden) return;
+  if (!awayPop || awayPop.hidden) {
+    awayKey = "";
+    paintAwayOpen();
+    return;
+  }
   awayPop.hidden = true;
   awayPop.replaceChildren();
+  awayKey = "";
+  paintAwayOpen();
   var back = awayReturn;
   awayReturn = null;
   if (restore && back) focusNoScroll(back);
@@ -194,27 +214,39 @@ function focusNoScroll(el) {
 
 function openAwayExplainer(anchor) {
   if (!awayPop) return;
+  if (awayPop && !awayPop.hidden && !awayKey) {
+    closeAwayPop(true);
+    return;
+  }
   closeQuickEdit(false);
   closeDayList();
   hideTip();
   awayReturn = anchor;
+  awayKey = "";
   awayPop.hidden = false;
   awayPop.replaceChildren();
   var text = document.createElement("p");
   text.textContent = "Days away: total trip days in each month. Click a number for details.";
   awayPop.append(text);
   placeAwayPop(anchor);
+  paintAwayOpen();
   focusNoScroll(awayPop);
 }
 
 function openAwayMonth(ym, anchor) {
   if (!awayPop) return;
+  var nextKey = Planner.awayToggle(awayKey, ym);
+  if (!nextKey) {
+    closeAwayPop(true);
+    return;
+  }
   var parts = String(ym || "").split("-");
   var detail = Planner.monthAwayDetail(visible(), +parts[0], +parts[1]);
   closeQuickEdit(false);
   closeDayList();
   hideTip();
   awayReturn = anchor;
+  awayKey = nextKey;
   awayPop.hidden = false;
   awayPop.replaceChildren();
   var title = document.createElement("p");
@@ -254,6 +286,7 @@ function openAwayMonth(ym, anchor) {
     awayPop.append(list);
   }
   placeAwayPop(anchor);
+  paintAwayOpen();
   var first = awayPop.querySelector("button");
   focusNoScroll(first || awayPop);
 }
@@ -336,9 +369,87 @@ function saveQuick(patch) {
   });
 }
 
+var quickAddOpen = false;
+
+function quickAddTopInset() {
+  var edge = 8;
+  var root = document.documentElement;
+  if (root.classList.contains("is-full") || root.classList.contains("is-edge")) edge = 40;
+  var header = document.querySelector("header.top");
+  if (header) edge = Math.max(edge, Math.ceil(header.getBoundingClientRect().bottom) + 4);
+  var dayhead = board.querySelector(".dayhead-bar");
+  if (dayhead) {
+    var bottom = dayhead.getBoundingClientRect().bottom;
+    if (bottom > 0) edge = Math.max(edge, Math.ceil(bottom) + 4);
+  }
+  return edge;
+}
+
+function quickAddAnchor() {
+  if (!selection) return null;
+  var iso = selection.edge === "start" ? selection.start : selection.end;
+  var cell = board.querySelector('.cell[data-date="' + iso + '"]');
+  if (!cell) return null;
+  var box = cell.getBoundingClientRect();
+  if (box.width < 1) return null;
+  return { left: box.left, top: box.top, right: box.right, bottom: box.bottom, width: box.width, height: box.height };
+}
+
+function placeQuickAdd() {
+  if (!actionEl || actionEl.hidden) return;
+  var anchor = quickAddAnchor();
+  if (!anchor) return;
+  var width = actionEl.offsetWidth || 300;
+  var height = actionEl.offsetHeight || 148;
+  var placed = Planner.placeNear(
+    anchor,
+    { width: width, height: height },
+    { width: window.innerWidth, height: window.innerHeight },
+    10,
+    { top: quickAddTopInset(), right: 8, bottom: 8, left: 8 }
+  );
+  actionEl.style.left = placed.left + "px";
+  actionEl.style.top = placed.top + "px";
+  actionEl.classList.toggle("above", placed.flipped);
+  var notch = placed.arrow - 5;
+  actionEl.style.setProperty("--arrow", Math.max(12, Math.min(notch, width - 22)) + "px");
+}
+
+function resetQuickAdd(range) {
+  if (typeof qaImages !== "undefined") qaImages = [];
+  if (typeof qaColor !== "undefined") qaColor = "";
+  var name = document.getElementById("qa-name");
+  if (name) name.value = "";
+  var note = document.getElementById("qa-note");
+  if (note) {
+    note.value = "";
+    note.hidden = true;
+  }
+  var tag = document.getElementById("qa-tag-name");
+  if (tag) tag.value = "";
+  var tags = document.getElementById("qa-tags");
+  if (tags) tags.hidden = true;
+  var err = document.getElementById("qa-error");
+  if (err) err.textContent = "";
+  var photos = document.getElementById("qa-photos");
+  if (photos) photos.replaceChildren();
+  var tagBtn = document.getElementById("qa-tag");
+  if (tagBtn) tagBtn.setAttribute("aria-expanded", "false");
+  var noteBtn = document.getElementById("qa-note-btn");
+  if (noteBtn) noteBtn.setAttribute("aria-expanded", "false");
+  var photoBtn = document.getElementById("qa-photo");
+  if (photoBtn) photoBtn.textContent = "Attach photo";
+  if (typeof setQuickType === "function") {
+    setQuickType(range && range.start !== range.end ? "Trip" : "Event");
+  }
+}
+
 function showAddBar(range) {
+  if (!range) return "";
   var text = Planner.rangeCountLabel(range.start, range.end);
+  var opening = actionEl.hidden;
   actionEl.hidden = false;
+  actionEl.classList.add("is-quick");
   actionLabel.textContent = text;
   actionAdd.hidden = false;
   actionAdd.textContent = "Add plan";
@@ -348,27 +459,33 @@ function showAddBar(range) {
   noteShownFor = null;
   noteCard.hidden = true;
   noteCard.replaceChildren();
+  if (opening) {
+    quickAddOpen = true;
+    resetQuickAdd(range);
+    placeQuickAdd();
+    var name = document.getElementById("qa-name");
+    if (name) name.focus({ preventScroll: true });
+  } else {
+    placeQuickAdd();
+  }
+  requestAnimationFrame(placeQuickAdd);
   return text;
 }
 
 function updateAction() {
-  var live = arm ? ordered(arm, hoverDate || arm) : null;
   var plan = selectedId ? planById(selectedId) : null;
-  if (live) {
-    showFloater(showAddBar(live));
-    return;
-  }
-  if (!(gesture && gesture.moved)) hideFloater();
+  if (!(gesture && gesture.moved) && !(typeof rangeDrag !== "undefined" && rangeDrag)) hideFloater();
   if (!plan && !selection) {
+    quickAddOpen = false;
     actionEl.hidden = true;
     noteCard.hidden = true;
     noteCard.replaceChildren();
     return;
   }
-  actionEl.hidden = false;
   actionEdit.hidden = !plan;
   actionDelete.hidden = !plan;
   if (plan) {
+    quickAddOpen = false;
     actionEl.hidden = true;
     if (noteShownFor === plan.id && !noteCard.hidden) showNote(plan, true);
     else if (noteShownFor !== plan.id && noteDismissedFor !== plan.id) {
@@ -406,7 +523,8 @@ function linkify(text, parent) {
 
 function showNote(plan, force) {
   var images = plan.images || [];
-  if (!force && (noteDismissedFor === plan.id || (!plan.note && !images.length))) {
+  if (!plan) return;
+  if (!force && noteDismissedFor === plan.id) {
     noteCard.hidden = true;
     noteCard.replaceChildren();
     return;
@@ -416,14 +534,25 @@ function showNote(plan, force) {
   noteShownFor = plan.id;
   var sheet = document.createElement("div");
   sheet.className = "note-sheet";
-  if (plan.note) {
+  var name = document.createElement("p");
+  name.className = "note-name";
+  name.textContent = plan.title;
+  var range = document.createElement("p");
+  range.className = "note-range";
+  range.textContent = Planner.planSpanPhrase(plan.start, plan.end);
+  var meta = document.createElement("p");
+  meta.className = "note-meta";
+  meta.textContent = [
+    Planner.planLengthPhrase(plan.start, plan.end),
+    Planner.planType(plan),
+    Planner.planTimingPhrase(plan.start, plan.end, todayIso())
+  ].filter(Boolean).join(" · ");
+  sheet.append(name, range, meta);
+  if (plan.note && String(plan.note).trim()) {
     var body = document.createElement("p");
-    linkify(plan.note, body);
+    body.className = "note-body";
+    linkify(String(plan.note).trim(), body);
     sheet.append(body);
-  } else if (!images.length) {
-    var empty = document.createElement("p");
-    empty.textContent = "No note yet.";
-    sheet.append(empty);
   }
   if (images.length) {
     var shots = document.createElement("div");
@@ -439,9 +568,28 @@ function showNote(plan, force) {
     });
     sheet.append(shots);
   }
+  if (force) {
+    var actions = document.createElement("div");
+    actions.className = "note-actions";
+    var edit = document.createElement("button");
+    edit.type = "button";
+    edit.className = "ghost";
+    edit.textContent = "Edit";
+    edit.addEventListener("click", function () { openEditor(plan); });
+    actions.append(edit);
+    if (plan.source !== "gcal") {
+      var remove = document.createElement("button");
+      remove.type = "button";
+      remove.className = "ghost";
+      remove.textContent = "Delete";
+      remove.addEventListener("click", function () { deletePlan(plan.id); });
+      actions.append(remove);
+    }
+    sheet.append(actions);
+  }
   noteCard.append(sheet);
   noteCard.style.borderTopColor = plan.color || "var(--accent)";
-  noteCard.style.borderTopWidth = "2px";
+  noteCard.style.borderTopWidth = "1px";
   placeNote();
   noteCard.querySelectorAll("img").forEach(function (img) {
     img.addEventListener("load", placeNote);
@@ -533,6 +681,8 @@ function render() {
   syncTips();
   paintSelection();
   paintFocus();
+  paintAwayOpen();
+  if (awayPop && !awayPop.hidden && awayReturn && awayReturn.isConnected) placeAwayPop(awayReturn);
   if (!noteCard.hidden && selectedId && planById(selectedId)) showNote(planById(selectedId), true);
   applySnapPadding();
   if (keepYm) {

@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased
+
+- Plan names sit in the widest free stretch of the bar, clear of day dots. Dots keep their own lane under the weekday letters. Short bars still end in an ellipsis, and the day count drops before the name does.
+- Selecting a plan highlights the bar itself. The note shows the name, the date range, how many days it covers, whether it is coming up, in progress, or over, and the type. The note is shown only when the plan has one. Edit and delete stay on the card, and double-click still opens the editor.
+- The full-screen button follows the real window state. The bar menu, the F key, F11, and the header button all leave full screen, and the button label matches.
+- In the wide Next block, the day count stays next to the plan name.
+- The bar menu has a Bar position row: Left, Center, or Right. It moves this plugin in the Omarchy shell layout and, when the module is already listed, in Waybar's `modules-left`, `modules-center`, or `modules-right`. The config is backed up first, other entries are left alone, and the bar is reloaded. Keys 1, 2, and 3 select a side.
+- Pin to desktop is an icon in the utility cluster on the right, after full screen and before Add plan. The year arrows, Today, and Rolling 12 stay centered.
+- The board opens on the previous year through two years ahead, and keeps 2025–2028 on screen while that window still overlaps them. The year arrows stop at the ends.
+- Clicking an empty day opens a small add popover on that cell, with the name focused. It can attach a photo (stored in this browser), a tag and color, a trip or plan type, and a note. Enter adds it, Esc or a click outside closes it, and the popover flips so it stays on screen and clear of the bar.
+- A handle on the selection extends or shrinks the range. Shift+click and Shift+arrow do the same. Dragging a plan waits until the pointer has moved, and only the plan's own end handles resize it.
+- The Away count toggles. The same month closes the summary, another month switches to it, and Esc or a click outside closes it. The open cell stays highlighted.
+- A plan that crosses a month fades out over about two days at the end of the row, and fades in the same way on the next row. The ‹ › stay small on that fade. Hovering or selecting either piece highlights both. The name stays on the longer piece, or on both when they are close in length, and it stays out of the fade.
+
 ## 1.1.8
 
 ### Security

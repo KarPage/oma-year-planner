@@ -22,6 +22,7 @@ function plansOn(iso) {
 
 function renderChrome() {
   yearLabel.textContent = String(year);
+  syncYearNav();
   sessionStorage.setItem("year-planner/year", String(year));
   var list = visible();
   var trips = Planner.countTrips(list);
@@ -362,6 +363,7 @@ function buildGrid() {
   away.textContent = "Away";
   away.title = "Days away from home this month";
   away.setAttribute("aria-label", "Days away from home this month");
+  away.setAttribute("aria-expanded", "false");
   away.style.gridColumn = "33";
   bar.append(away);
 
@@ -440,6 +442,7 @@ function buildGrid() {
     total.style.gridRow = String(row);
     total.textContent = "0";
     total.title = "Days away";
+    total.setAttribute("aria-expanded", "false");
     calendar.append(total);
     row += 1;
   });
@@ -500,6 +503,10 @@ function syncBars() {
     el.style.setProperty("--lane", String(bar.lane));
     el.style.setProperty("--lanes", String(laid.lanes[ym] || 1));
     el.dataset.id = plan.id;
+    el.dataset.ym = ym;
+    el.dataset.start = String(bar.startDay);
+    el.dataset.end = String(bar.endDay);
+    el.style.setProperty("--span", String(span));
     var progress = Planner.checklistProgress(plan);
     var tip = planAria(plan, bar.days + (bar.days === 1 ? " day" : " days") + (progress ? ", " + progress.done + " of " + progress.total : ""));
     el.title = tip;
@@ -509,10 +516,12 @@ function syncBars() {
     fill.className = "fill";
     if (bar.continuesBefore) {
       var before = document.createElement("span");
-      before.className = "edge";
+      before.className = "edge before";
       before.textContent = "‹";
       fill.append(before);
     }
+    var slot = document.createElement("span");
+    slot.className = "label-slot";
     var text = document.createElement("span");
     text.className = "label";
     text.textContent = plan.title;
@@ -522,10 +531,12 @@ function syncBars() {
     pill.className = "pill";
     pill.textContent = bar.days + "d";
     count.append(pill);
-    fill.append(text, count);
+    if (plan.source === "gcal") slot.append(googleMark());
+    slot.append(text, count);
+    fill.append(slot);
     if (bar.continuesAfter) {
       var after = document.createElement("span");
-      after.className = "edge";
+      after.className = "edge after";
       after.textContent = "›";
       fill.append(after);
     }
@@ -539,15 +550,10 @@ function syncBars() {
       tooled[plan.id] = true;
       fill.append(planTools(plan));
     }
-    if (plan.source === "gcal") {
-      el.classList.add("is-gcal");
-      fill.insertBefore(googleMark(), fill.firstChild);
-    }
+    if (plan.source === "gcal") el.classList.add("is-gcal");
     el.append(fill);
     calendar.append(el);
   });
-  fitBarLabels();
-  requestAnimationFrame(fitBarLabels);
   Object.keys(groups).forEach(function (iso) {
     var segs = groups[iso];
     var host = board.querySelector('.month[data-ym="' + iso.slice(0, 7) + '"]');
@@ -597,7 +603,100 @@ function syncBars() {
       calendar.append(tick);
     }
   });
+  placeBarLabels();
+  fitBarLabels();
+  requestAnimationFrame(fitBarLabels);
 }
+
+/* Put the name in the widest gap between day dots, centered in that gap.
+   A month wrap keeps the name off the faded days, and off the shorter piece. */
+function placeBarLabels() {
+  var blocked = Object.create(null);
+  function mark(ym, day) {
+    if (!ym || !(day > 0)) return;
+    if (!blocked[ym]) blocked[ym] = [];
+    if (blocked[ym].indexOf(day) < 0) blocked[ym].push(day);
+  }
+  board.querySelectorAll(".bar.single, .single-more").forEach(function (el) {
+    var parts = Planner.parse(el.dataset.date);
+    if (parts) mark(el.dataset.date.slice(0, 7), parts.d);
+  });
+  board.querySelectorAll(".bar.is-brief").forEach(function (el) {
+    var start = +el.dataset.start;
+    var end = +el.dataset.end;
+    for (var day = start; day <= end; day++) mark(el.dataset.ym, day);
+  });
+  var bars = board.querySelectorAll(".bar:not(.single):not(.is-brief)");
+  var groups = Object.create(null);
+  bars.forEach(function (el) {
+    var id = el.dataset.id || "";
+    if (!groups[id]) groups[id] = [];
+    groups[id].push(el);
+  });
+  var wrap = new WeakMap();
+  Object.keys(groups).forEach(function (id) {
+    var els = groups[id];
+    var info = Planner.wrapLabels(els.map(function (el) {
+      return {
+        span: (+el.dataset.end) - (+el.dataset.start) + 1,
+        continuesBefore: el.classList.contains("cont-before"),
+        continuesAfter: el.classList.contains("cont-after")
+      };
+    }));
+    els.forEach(function (el, i) { wrap.set(el, info[i]); });
+  });
+  bars.forEach(function (el) {
+    var start = +el.dataset.start;
+    var end = +el.dataset.end;
+    var width = end - start + 1;
+    var call = wrap.get(el) || { show: true, lead: 0, tail: 0 };
+    var fill = el.querySelector(".fill");
+    if (!fill) return;
+    var lead = call.lead || 0;
+    var tail = call.tail || 0;
+    var days = (blocked[el.dataset.ym] || []).slice();
+    var i;
+    for (i = 0; i < lead; i++) days.push(start + i);
+    for (i = 0; i < tail; i++) days.push(end - i);
+    var slot = Planner.labelSlot(start, end, days);
+    var clearFrom = lead + 1;
+    var clearSpan = width - lead - tail;
+    var slotEnd = slot.from + slot.span - 1;
+    if ((lead || tail) && clearSpan >= 1 && (slot.from < clearFrom || slotEnd > width - tail)) {
+      slot = { from: clearFrom, span: clearSpan };
+    }
+    var show = !!call.show && clearSpan >= 1;
+    el.classList.toggle("label-off", !show);
+    fill.style.setProperty("--slot-from", String(slot.from));
+    fill.style.setProperty("--slot-span", String(slot.span));
+    fill.classList.toggle("slot-at-start", show && slot.from === 1 && el.classList.contains("cont-before"));
+    fill.classList.toggle("slot-at-end", show && slot.from + slot.span - 1 === width && el.classList.contains("cont-after"));
+  });
+}
+
+/* Hovering one piece of a wrapping plan highlights every piece. */
+function paintLinked(id) {
+  var mates = [];
+  board.querySelectorAll(".bar").forEach(function (el) {
+    if (id && el.dataset.id === id && !el.classList.contains("single") && !el.classList.contains("is-brief")) mates.push(el);
+    else el.classList.remove("is-linked");
+  });
+  var on = mates.length > 1;
+  mates.forEach(function (el) { el.classList.toggle("is-linked", on); });
+}
+
+board.addEventListener("pointerover", function (event) {
+  var bar = event.target.closest && event.target.closest(".bar");
+  if (!bar || bar.classList.contains("single") || bar.classList.contains("is-brief")) return;
+  paintLinked(bar.dataset.id);
+});
+board.addEventListener("pointerout", function (event) {
+  var bar = event.target.closest && event.target.closest(".bar");
+  if (!bar) return;
+  var next = event.relatedTarget && event.relatedTarget.closest && event.relatedTarget.closest(".bar");
+  if (next && next.dataset.id === bar.dataset.id) return;
+  paintLinked("");
+});
 
 function segmentProgress(bar, today) {
   var span = bar.endDay - bar.startDay + 1;
@@ -683,7 +782,7 @@ function syncEmpty() {
   if (plans.length) return;
   var hint = document.createElement("p");
   hint.className = "empty-hint";
-  hint.textContent = "Drag across days to add your first plan";
+  hint.textContent = "Click a day to add. Drag the handle to extend.";
   board.append(hint);
 }
 
@@ -900,6 +999,21 @@ function updateViewYear() {
   }
   year = found;
   yearLabel.textContent = String(year);
+  syncYearNav();
+}
+
+function syncYearNav() {
+  var ends = Planner.yearNavEnds(year, RANGE_START, RANGE_END);
+  var prev = document.getElementById("prev");
+  var next = document.getElementById("next");
+  if (prev) {
+    prev.disabled = !!ends.prev;
+    prev.setAttribute("aria-disabled", ends.prev ? "true" : "false");
+  }
+  if (next) {
+    next.disabled = !!ends.next;
+    next.setAttribute("aria-disabled", ends.next ? "true" : "false");
+  }
 }
 
 function toolButton(kind, label, onClick) {
@@ -984,18 +1098,64 @@ function paintDaynums(marks) {
   });
 }
 
+function selectionHandleEl() {
+  var node = document.getElementById("range-handle");
+  if (node) return node;
+  node = document.createElement("button");
+  node.type = "button";
+  node.id = "range-handle";
+  node.className = "range-handle";
+  node.hidden = true;
+  node.setAttribute("aria-label", "Drag to extend the range");
+  node.title = "Drag to extend";
+  document.body.appendChild(node);
+  node.addEventListener("pointerdown", function (event) {
+    if (typeof onRangeHandleDown === "function") onRangeHandleDown(event);
+  });
+  return node;
+}
+
+function placeSelectionHandle() {
+  var handle = selectionHandleEl();
+  var marking = selectedId ? null : selection;
+  if (!marking || (gesture && gesture.moved)) {
+    handle.hidden = true;
+    return;
+  }
+  var iso = marking.edge === "start" ? marking.start : marking.end;
+  var cell = board.querySelector('.cell[data-date="' + iso + '"]');
+  if (!cell) {
+    handle.hidden = true;
+    return;
+  }
+  var box = cell.getBoundingClientRect();
+  if (box.width < 1 || box.bottom < 0 || box.top > window.innerHeight) {
+    handle.hidden = true;
+    return;
+  }
+  handle.hidden = false;
+  handle.classList.toggle("is-start", marking.edge === "start");
+  var width = 22;
+  var height = Math.max(22, Math.min(36, box.height - 8));
+  var left = marking.edge === "start" ? box.left - width / 2 : box.right - width / 2;
+  var top = box.top + (box.height - height) / 2;
+  handle.style.width = width + "px";
+  handle.style.height = height + "px";
+  handle.style.left = Math.round(left) + "px";
+  handle.style.top = Math.round(top) + "px";
+}
+
 function paintSelection() {
-  var follow = arm ? ordered(arm, hoverDate || arm) : null;
-  var committed = !arm && selection ? selection : null;
-  var single = committed && committed.start === committed.end;
+  var marking = selectedId ? null : selection;
+  var single = marking && marking.start === marking.end;
   board.querySelectorAll(".cell[data-date]").forEach(function (cell) {
     var iso = cell.dataset.date;
-    cell.classList.toggle("follow", !!(follow && iso >= follow.start && iso <= follow.end));
-    cell.classList.toggle("picked", !!(single && iso === committed.start));
-    cell.classList.toggle("range", !!(committed && !single && iso >= committed.start && iso <= committed.end));
+    cell.classList.remove("follow");
+    cell.classList.toggle("picked", !!(single && iso === marking.start));
+    cell.classList.toggle("range", !!(marking && !single && iso >= marking.start && iso <= marking.end));
   });
-  var active = follow || committed;
-  paintDaynums(active ? dayNumbersIn(active.start, active.end) : {});
+  paintDaynums({});
+  placeSelectionHandle();
   updateAction();
 }
 

@@ -2,8 +2,8 @@
 """Localhost-only bridge so the planner page can pin the wallpaper.
 
 A file:// page cannot run shell commands. ./open starts this on 127.0.0.1.
-It accepts only pin, unpin, toggle (POST) and status, ping (GET), and it
-never reads a request body.
+It accepts only pin, unpin, toggle, fullscreen (POST) and status, ping (GET),
+and it never reads a request body.
 
   ./bridge ensure          start the helper if it is not running
   ./bridge launch          write a one-time launcher page and print its path
@@ -35,6 +35,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
 WALL = os.environ.get("OMA_YEAR_WALLPAPER") or os.path.join(ROOT, "wallpaper")
+APP = os.environ.get("OMA_YEAR_APP") or os.path.join(ROOT, "app")
 HOST = "127.0.0.1"
 PORT = int(os.environ.get("OMA_YEAR_BRIDGE_PORT") or 47321)
 ALLOWED = {"null", "http://localhost:8080", "http://127.0.0.1:8080"}
@@ -92,6 +93,15 @@ def pinned_now():
     first = (result.stdout or "").splitlines()
     line = first[0].strip() if first else ""
     return line == "pinned", result.returncode
+
+
+def fullscreen_now():
+    """Read the window manager's full-screen bit. Never toggles it."""
+    try:
+        result = subprocess.run([APP, "status"], capture_output=True, text=True, timeout=8)
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+    return "fullscreen=1" in (result.stdout or "")
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -169,20 +179,37 @@ class Handler(BaseHTTPRequestHandler):
             self.send_json(404, {"error": "not found"}, origin)
             return
         pinned, code = pinned_now()
-        self.send_json(200 if code == 0 else 500, {"pinned": pinned}, origin)
+        self.send_json(200 if code == 0 else 500, {
+            "pinned": pinned,
+            "fullscreen": fullscreen_now(),
+        }, origin)
 
     def do_POST(self):
         origin = self.gate()
         if not origin:
             return
         action = self.path.split("?", 1)[0].lstrip("/")
-        if action not in ("pin", "unpin", "toggle"):
+        if action not in ("pin", "unpin", "toggle", "fullscreen"):
             self.send_json(404, {"error": "not found"}, origin)
             return
         # Discard any body. The action comes only from the path.
         length = int(self.headers.get("Content-Length") or 0)
         if length:
             self.rfile.read(min(length, 4096))
+        if action == "fullscreen":
+            try:
+                result = subprocess.run([APP, "fullscreen"], capture_output=True, text=True, timeout=20)
+            except (OSError, subprocess.TimeoutExpired):
+                pinned, _code = pinned_now()
+                self.send_json(500, {"pinned": pinned, "fullscreen": False, "error": "failed"}, origin)
+                return
+            pinned, _code = pinned_now()
+            full = fullscreen_now()
+            if result.returncode != 0:
+                self.send_json(500, {"pinned": pinned, "fullscreen": full, "error": "failed"}, origin)
+                return
+            self.send_json(200, {"pinned": pinned, "fullscreen": full}, origin)
+            return
         result = subprocess.run([WALL, action], capture_output=True, text=True, timeout=180)
         pinned, _code = pinned_now()
         if result.returncode != 0:

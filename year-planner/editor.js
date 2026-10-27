@@ -1,14 +1,36 @@
 /* Add and edit dialog, checklist, and images. */
+var rangeDrag = null;
+var qaImages = [];
+var qaColor = "";
+
+function onRangeHandleDown(event) {
+  if (event.button !== 0 || !selection) return;
+  event.preventDefault();
+  event.stopPropagation();
+  var anchor = selection.anchor || selection.start;
+  rangeDrag = {
+    anchor: anchor,
+    x: event.clientX,
+    y: event.clientY,
+    moved: false,
+    pointerId: event.pointerId
+  };
+  if (event.currentTarget.setPointerCapture) {
+    try { event.currentTarget.setPointerCapture(event.pointerId); } catch (err) { /* already gone */ }
+  }
+}
+
 function onBarDown(event) {
   if (event.button !== 0) return;
   event.stopPropagation();
   var bar = event.target.closest(".bar");
   var plan = planById(bar.dataset.id);
   if (!plan || plan.source === "gcal") return;
-  var resize = event.target.dataset && event.target.dataset.resize;
+  var where = event.target.dataset && event.target.dataset.resize ? event.target.dataset.resize : "body";
   gesture = {
     kind: "plan",
-    mode: resize || "move",
+    where: where,
+    mode: where === "body" ? "move" : where,
     id: plan.id,
     originStart: plan.start,
     originEnd: plan.end,
@@ -44,19 +66,28 @@ function onPointerMove(event) {
       fallbackHeight: 28
     });
   }
-  if (createDrag && !gesture) {
-    var over = dateFromPoint(event.clientX, event.clientY);
-    if (over && over !== createDrag.iso && Math.hypot(event.clientX - createDrag.x, event.clientY - createDrag.y) > 6) {
-      createDrag.moved = true;
-      arm = createDrag.iso;
-      hoverDate = over;
-      paintSelection();
-    }
+  if (rangeDrag && !gesture) {
+    if (!rangeDrag.moved && !Planner.dragPastThreshold(event.clientX - rangeDrag.x, event.clientY - rangeDrag.y)) return;
+    rangeDrag.moved = true;
+    var edge = dateFromPoint(event.clientX, event.clientY);
+    if (!edge) return;
+    var nextRange = Planner.extendSelection({ anchor: rangeDrag.anchor, start: rangeDrag.anchor, end: rangeDrag.anchor }, edge);
+    if (!nextRange) return;
+    var edgeYear = Planner.parse(nextRange.edge === "start" ? nextRange.start : nextRange.end);
+    if (!edgeYear || edgeYear.y < RANGE_START || edgeYear.y > RANGE_END) return;
+    selection = nextRange;
+    focusDate = nextRange.edge === "start" ? nextRange.start : nextRange.end;
+    paintSelection();
     return;
   }
   if (!gesture) return;
   var iso = dateFromPoint(event.clientX, event.clientY);
-  if (!gesture.moved && Math.hypot(event.clientX - gesture.x, event.clientY - gesture.y) < 6) return;
+  if (!gesture.moved && !Planner.dragPastThreshold(event.clientX - gesture.x, event.clientY - gesture.y)) return;
+  if (!gesture.moved) {
+    var kind = Planner.planGesture(gesture.where || "body", true);
+    if (kind === "none") return;
+    gesture.mode = kind === "resize" ? (gesture.where === "start" ? "start" : "end") : "move";
+  }
   gesture.moved = true;
   if (!iso) return;
   var plan = planById(gesture.id);
@@ -90,19 +121,10 @@ function onPointerUp(event) {
     endBoardDrag();
     return;
   }
-  if (createDrag && !gesture) {
-    var drag = createDrag;
-    createDrag = null;
-    if (drag.moved) {
-      suppressClick = true;
-      selection = ordered(drag.iso, hoverDate || drag.iso);
-      arm = null;
-      hoverDate = null;
-      focusDate = selection.start;
-      clearPlanSelection();
-      paintSelection();
-      openEditor(null, { start: selection.start, end: selection.end });
-    }
+  if (rangeDrag && !gesture) {
+    if (rangeDrag.moved) suppressClick = true;
+    rangeDrag = null;
+    paintSelection();
     return;
   }
   if (!gesture) return;
@@ -126,7 +148,7 @@ function onPointerUp(event) {
     noteDismissedFor = null;
     selectedId = current.id;
     if (plan) selection = { start: plan.start, end: plan.end };
-    setStatus("Drag either end to change the days. Double-click to edit the note.");
+    setStatus("Drag either end to resize. Drag the bar to move it. Double-click to edit.");
     paintSelection();
     if (plan) {
       showNote(plan, true);
@@ -197,23 +219,15 @@ function onCellClick(event) {
     return;
   }
   var cell = event.target.closest && event.target.closest(".cell[data-date]");
-  if (!cell || event.target.closest(".bar")) return;
+  if (!cell || event.target.closest(".bar") || event.target.closest("#range-handle")) return;
   var iso = cell.dataset.date;
   focusDate = iso;
   paintFocus();
   clearPlanSelection();
-  if (arm) {
-    commitRange(iso);
-    return;
-  }
-  if (selection && selection.start === iso && selection.end === iso) {
-    arm = iso;
-    hoverDate = iso;
-    paintSelection();
-    setStatus("Click a day to add the plan, or click this day again to add just this day.");
-    return;
-  }
-  selection = { start: iso, end: iso };
+  arm = null;
+  hoverDate = null;
+  if (event.shiftKey && selection) selection = Planner.extendSelection(selection, iso);
+  else selection = Planner.selectionSpan(iso, iso);
   paintSelection();
 }
 
@@ -681,7 +695,12 @@ startInput.addEventListener("change", function () {
   if (endInput.value && endInput.value < startInput.value) endInput.value = startInput.value;
 });
 
-actionAdd.addEventListener("click", function () {
+actionAdd.addEventListener("click", function (event) {
+  if (actionEl && actionEl.classList.contains("is-quick") && !actionEl.hidden) {
+    event.preventDefault();
+    submitQuickAdd();
+    return;
+  }
   addFromSelection(!!selectedId);
 });
 actionEdit.addEventListener("click", function () {
@@ -703,10 +722,12 @@ actionDelete.addEventListener("click", function () {
 });
 
 document.getElementById("prev").addEventListener("click", function () {
-  scrollToMonth(Math.max(RANGE_START, year - 1), 1, true);
+  if (year <= RANGE_START) return;
+  scrollToMonth(year - 1, 1, true);
 });
 document.getElementById("next").addEventListener("click", function () {
-  scrollToMonth(Math.min(RANGE_END, year + 1), 1, true);
+  if (year >= RANGE_END) return;
+  scrollToMonth(year + 1, 1, true);
 });
 document.getElementById("today-title").addEventListener("click", function () {
   document.getElementById("today").click();
@@ -715,7 +736,7 @@ document.getElementById("today-title").addEventListener("click", function () {
 document.getElementById("today").addEventListener("click", function () {
   var today = todayParts();
   focusDate = cellDate(today.y, today.m, today.d);
-  selection = { start: focusDate, end: focusDate };
+  selection = Planner.selectionSpan(focusDate, focusDate);
   arm = null;
   hoverDate = null;
   selectedId = null;
@@ -726,3 +747,205 @@ document.getElementById("today").addEventListener("click", function () {
 
 var rollingBtn = document.getElementById("rolling");
 var rolling = sessionStorage.getItem("year-planner/rolling") === "1";
+
+function nudgeQuickRange(delta) {
+  if (!selection || selectedId) return;
+  var next = Planner.nudgeSelection(selection, delta);
+  if (!next) return;
+  var edge = Planner.parse(next.edge === "start" ? next.start : next.end);
+  if (!edge || edge.y < RANGE_START || edge.y > RANGE_END) return;
+  selection = next;
+  focusDate = next.edge === "start" ? next.start : next.end;
+  paintSelection();
+  paintFocus();
+  var cell = board.querySelector('.cell[data-date="' + focusDate + '"]');
+  if (!cell) return;
+  var top = cell.getBoundingClientRect().top - board.getBoundingClientRect().top;
+  if (top < headHeight() || top > board.clientHeight - 40) {
+    var parts = Planner.parse(focusDate);
+    if (parts) scrollToMonth(parts.y, parts.m, true);
+  }
+}
+
+function setQuickType(type) {
+  var trip = type === "Trip";
+  var planBtn = document.getElementById("qa-plan");
+  var tripBtn = document.getElementById("qa-trip");
+  if (planBtn) planBtn.setAttribute("aria-pressed", trip ? "false" : "true");
+  if (tripBtn) tripBtn.setAttribute("aria-pressed", trip ? "true" : "false");
+}
+
+function quickType() {
+  var tripBtn = document.getElementById("qa-trip");
+  return tripBtn && tripBtn.getAttribute("aria-pressed") === "true" ? "Trip" : "Event";
+}
+
+function paintQuickAddSwatches() {
+  var row = document.getElementById("qa-swatches");
+  if (!row) return;
+  row.replaceChildren();
+  PLAN_SWATCHES.forEach(function (swatch) {
+    var hex = themeSwatch(swatch.name);
+    if (!hex) return;
+    var button = document.createElement("button");
+    button.type = "button";
+    button.className = "swatch";
+    button.style.background = "var(" + swatch.name + ")";
+    button.setAttribute("aria-label", swatch.label);
+    button.setAttribute("aria-pressed", qaColor === hex ? "true" : "false");
+    button.addEventListener("click", function () {
+      qaColor = hex;
+      paintQuickAddSwatches();
+    });
+    row.append(button);
+  });
+}
+
+function renderQuickPhotos() {
+  var photos = document.getElementById("qa-photos");
+  var photoBtn = document.getElementById("qa-photo");
+  if (photoBtn) photoBtn.textContent = qaImages.length ? "Photo · " + qaImages.length : "Attach photo";
+  if (!photos) return;
+  photos.replaceChildren();
+  qaImages.forEach(function (image, index) {
+    var frame = document.createElement("span");
+    frame.className = "qa-shot";
+    var img = document.createElement("img");
+    img.src = image.src;
+    img.alt = image.name || "Attached image";
+    var remove = document.createElement("button");
+    remove.type = "button";
+    remove.textContent = "×";
+    remove.setAttribute("aria-label", "Remove photo");
+    remove.addEventListener("click", function () {
+      qaImages.splice(index, 1);
+      renderQuickPhotos();
+      placeQuickAdd();
+    });
+    frame.append(img, remove);
+    photos.append(frame);
+  });
+}
+
+var quickAdding = false;
+
+function submitQuickAdd() {
+  if (quickAdding) return;
+  var range = selection;
+  var name = document.getElementById("qa-name");
+  var err = document.getElementById("qa-error");
+  if (!range) return;
+  var title = name ? name.value.trim() : "";
+  if (!title) {
+    if (err) err.textContent = "Name the plan.";
+    if (name) name.focus();
+    return;
+  }
+  quickAdding = true;
+  var noteEl = document.getElementById("qa-note");
+  var tagEl = document.getElementById("qa-tag-name");
+  var tags = document.getElementById("qa-tags");
+  var type = quickType();
+  var normalized = Planner.makePlan(null, {
+    id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now()),
+    title: title,
+    type: type,
+    color: qaColor || defaultSwatch(type),
+    tag: tags && !tags.hidden && tagEl ? tagEl.value : "",
+    note: noteEl && !noteEl.hidden ? noteEl.value : "",
+    images: qaImages.slice(),
+    start: range.start,
+    end: range.end
+  });
+  if (!normalized) {
+    quickAdding = false;
+    if (err) err.textContent = "Give the plan a name and a real date.";
+    return;
+  }
+  if (err) err.textContent = "";
+  commitEdit(function () {
+    plans = plans.concat([normalized]);
+    selectedId = normalized.id;
+    selection = { start: normalized.start, end: normalized.end };
+    focusDate = normalized.start;
+    arm = null;
+    hoverDate = null;
+    noteDismissedFor = null;
+    qaImages = [];
+    qaColor = "";
+  }, function () {
+    setStatus("Added " + normalized.title + ".");
+    showNote(normalized, true);
+  }).then(function () {
+    quickAdding = false;
+  }, function () {
+    quickAdding = false;
+  });
+}
+
+var qaForm = document.getElementById("qa-form");
+if (qaForm) {
+  qaForm.addEventListener("submit", function (event) {
+    event.preventDefault();
+    submitQuickAdd();
+  });
+}
+var qaPhoto = document.getElementById("qa-photo");
+var qaFile = document.getElementById("qa-file");
+if (qaPhoto && qaFile) {
+  qaPhoto.addEventListener("click", function () { qaFile.click(); });
+  qaFile.addEventListener("change", function () {
+    var file = qaFile.files && qaFile.files[0];
+    qaFile.value = "";
+    var err = document.getElementById("qa-error");
+    if (!file) return;
+    if (qaImages.length >= 4) {
+      if (err) err.textContent = "A plan can keep four images.";
+      return;
+    }
+    shrinkImage(file).then(function (src) {
+      if (src.length > 900000) {
+        if (err) err.textContent = "That image is too large to keep with the plan.";
+        return;
+      }
+      qaImages.push({ name: file.name || "image", src: src });
+      if (err) err.textContent = "";
+      renderQuickPhotos();
+      placeQuickAdd();
+    }).catch(function () {
+      if (err) err.textContent = "Couldn't read that image.";
+    });
+  });
+}
+var qaTagBtn = document.getElementById("qa-tag");
+if (qaTagBtn) {
+  qaTagBtn.addEventListener("click", function () {
+    var tags = document.getElementById("qa-tags");
+    if (!tags) return;
+    var open = tags.hidden;
+    tags.hidden = !open;
+    qaTagBtn.setAttribute("aria-expanded", open ? "true" : "false");
+    if (open) {
+      paintQuickAddSwatches();
+      var field = document.getElementById("qa-tag-name");
+      if (field) field.focus();
+    }
+    placeQuickAdd();
+  });
+}
+var qaNoteBtn = document.getElementById("qa-note-btn");
+if (qaNoteBtn) {
+  qaNoteBtn.addEventListener("click", function () {
+    var note = document.getElementById("qa-note");
+    if (!note) return;
+    var open = note.hidden;
+    note.hidden = !open;
+    qaNoteBtn.setAttribute("aria-expanded", open ? "true" : "false");
+    if (open) note.focus();
+    placeQuickAdd();
+  });
+}
+var qaPlan = document.getElementById("qa-plan");
+var qaTrip = document.getElementById("qa-trip");
+if (qaPlan) qaPlan.addEventListener("click", function () { setQuickType("Event"); });
+if (qaTrip) qaTrip.addEventListener("click", function () { setQuickType("Trip"); });

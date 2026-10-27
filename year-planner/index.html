@@ -46,26 +46,20 @@
       <button class="icon-btn" id="next" type="button" aria-label="Next year" title="Scroll to January of the next year">→</button>
       <button class="ghost" id="today" type="button">Today</button>
       <button class="ghost" id="rolling" type="button" aria-pressed="false" title="Start the view at the current month">Rolling 12</button>
-      <button class="icon-btn" id="keys-btn" type="button" aria-label="Help and shortcuts" title="Help and shortcuts">
-        <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
-          <rect x="1" y="3.5" width="14" height="9" rx="1.2" fill="none" stroke="currentColor" stroke-width="1.3"/>
-          <path d="M3.5 6h1M6.5 6h1M9.5 6h1M3.5 8.5h1M6 8.5h4M11.5 8.5h1" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
-        </svg>
-      </button>
-      <button class="ghost" id="pin-desk" type="button" aria-pressed="false" title="Pin to desktop: show the year board as your wallpaper">
-        <svg viewBox="0 0 16 16" aria-hidden="true">
-          <rect x="1.5" y="2.5" width="13" height="9" rx="1" fill="none" stroke="currentColor" stroke-width="1.3"/>
-          <path d="M8 11.5v2M5.5 13.5h5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
-        </svg>
-        <span id="pin-desk-label">Pin to desktop</span>
-      </button>
+    </div>
+    <div class="top-end">
       <button class="ghost" id="gcal-connect" type="button" hidden>
         <svg class="g-mark" viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M8 1.6a6.4 6.4 0 1 0 5.7 9.2H8.1V8.2h6.6A6.4 6.4 0 0 0 8 1.6z"/></svg>
         <span>Connect Google Calendar</span>
       </button>
       <button class="ghost gcal-chip" id="gcal-reconnect" type="button" hidden>Reconnect Google</button>
-    </div>
-    <div class="top-end">
+      <div class="util">
+      <button class="icon-btn" id="keys-btn" type="button" aria-label="Help and shortcuts" title="Help and shortcuts">
+        <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
+          <rect x="1" y="3.5" width="14" height="9" fill="none" stroke="currentColor" stroke-width="1.3"/>
+          <path d="M3.5 6h1M6.5 6h1M9.5 6h1M3.5 8.5h1M6 8.5h4M11.5 8.5h1" stroke="currentColor" stroke-width="1.2"/>
+        </svg>
+      </button>
       <button class="icon-btn" id="full-btn" type="button" aria-pressed="false" aria-label="Full screen (F)" title="Full screen (F)">
         <svg class="full-expand" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
           <path d="M3 6.5V3.5H6M10 3.5h3V6.5M3 9.5v3h3M10 12.5h3V9.5" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="square" stroke-linejoin="miter"/>
@@ -74,6 +68,14 @@
           <path d="M6.5 3.5V6.5H3.5M9.5 3.5V6.5H12.5M6.5 12.5V9.5H3.5M9.5 12.5V9.5H12.5" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="square" stroke-linejoin="miter"/>
         </svg>
       </button>
+      <button class="icon-btn" id="pin-desk" type="button" aria-pressed="false" aria-label="Pin to desktop" title="Pin to desktop">
+        <svg viewBox="0 0 16 16" aria-hidden="true">
+          <path d="M6 1.5h4v2.8l1.8 2.2H4.2L6 4.3V1.5z" fill="none" stroke="currentColor" stroke-width="1.3"/>
+          <path d="M7.2 6.5h1.6V14" fill="none" stroke="currentColor" stroke-width="1.3"/>
+        </svg>
+        <span id="pin-desk-label" class="sr-only">Pin to desktop</span>
+      </button>
+      </div>
       <button class="primary" id="add" type="button">+ Add plan</button>
     </div>
   </header>
@@ -106,10 +108,29 @@
   <div class="stage">
     <div class="board" id="board"></div>
     <div class="note-card" id="note-card" hidden></div>
-    <div class="action" id="action" hidden>
+    <div class="action is-quick" id="action" hidden role="dialog" aria-modal="false" aria-label="Add plan">
       <p id="action-label"></p>
-      <div class="action-buttons">
-        <button class="primary" id="action-add" type="button">Add plan</button>
+      <form id="qa-form">
+        <input id="qa-name" type="text" maxlength="200" placeholder="Name" aria-label="Plan name" autocomplete="off">
+        <div class="qa-row">
+          <button class="primary" id="action-add" type="submit">Add plan</button>
+          <button class="ghost" id="qa-photo" type="button">Attach photo</button>
+          <button class="ghost" id="qa-tag" type="button" aria-expanded="false">Add tag</button>
+          <button class="ghost" id="qa-plan" type="button" aria-pressed="true">Plan</button>
+          <button class="ghost" id="qa-trip" type="button" aria-pressed="false">Trip</button>
+          <button class="ghost" id="qa-note-btn" type="button" aria-expanded="false">Add note</button>
+        </div>
+        <div id="qa-tags" hidden>
+          <input id="qa-tag-name" type="text" maxlength="24" placeholder="Tag" aria-label="Tag" autocomplete="off">
+          <div id="qa-swatches" class="swatch-row"></div>
+        </div>
+        <textarea id="qa-note" hidden maxlength="5000" placeholder="Note" aria-label="Note"></textarea>
+        <div id="qa-photos" class="qa-photos"></div>
+        <p id="qa-error" class="qa-error"></p>
+        <p class="qa-tips">Enter add · Esc close · Drag the handle, Shift+click, or Shift+← → to extend</p>
+      </form>
+      <input id="qa-file" type="file" accept="image/*" hidden>
+      <div class="action-buttons" hidden>
         <button class="icon-btn" id="action-edit" type="button" aria-label="Edit plan" title="Edit plan">
           <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
             <path d="M2.5 11.8V13.5h1.7l7.4-7.4-1.7-1.7-7.4 7.4z" fill="none" stroke="currentColor" stroke-width="1.3"/>
@@ -133,7 +154,7 @@
 
   <footer class="foot">
     <div class="status-row">
-      <p id="status" role="status">Click a day. Click it again, then click once more to add the plan.</p>
+      <p id="status" role="status">Click a day to add. Drag the handle to extend.</p>
       <button id="undo" type="button" hidden>Undo</button>
     </div>
     <div class="backup">
@@ -156,17 +177,17 @@
         <article class="help-card">
           <div class="mini mini-drag" aria-hidden="true"><span></span><span></span><span class="on"></span><span class="on"></span><span class="on"></span><span></span><i class="cursor"></i></div>
           <h3>Add a plan</h3>
-          <p>Drag across days.</p>
+          <p>Click a day. Drag the handle to extend.</p>
         </article>
         <article class="help-card">
           <div class="mini mini-day" aria-hidden="true"><i class="pill"></i></div>
           <h3>One day</h3>
-          <p>Click a day twice.</p>
+          <p>Click a day, then name it.</p>
         </article>
         <article class="help-card">
           <div class="mini mini-bar" aria-hidden="true"><i class="barlet"></i><i class="cursor"></i></div>
           <h3>Move and resize</h3>
-          <p>Drag a bar or its ends.</p>
+          <p>Drag a bar to move it. Drag its ends to resize.</p>
         </article>
         <article class="help-card">
           <div class="mini mini-edit" aria-hidden="true"><i class="pill"></i><i class="pop"></i></div>
@@ -187,8 +208,8 @@
       <div class="help-cards" id="help-welcome">
         <article class="help-card">
           <div class="mini mini-drag" aria-hidden="true"><span></span><span></span><span class="on"></span><span class="on"></span><span class="on"></span><span></span><i class="cursor"></i></div>
-          <h3>Drag to add</h3>
-          <p>Sweep across the days you want.</p>
+          <h3>Drag the handle</h3>
+          <p>Click a day, then pull the handle to cover more days.</p>
         </article>
         <article class="help-card">
           <div class="mini mini-edit" aria-hidden="true"><i class="pill"></i><i class="pop"></i></div>
@@ -219,6 +240,8 @@
           <span><kbd>Home</kbd><kbd>End</kbd> Ends</span>
           <span><kbd>Enter</kbd> Edit</span>
           <span><kbd>Esc</kbd> Close</span>
+          <span><kbd>Shift</kbd>+click Extend range</span>
+          <span><kbd>Shift</kbd>+<kbd>←</kbd><kbd>→</kbd> Extend range</span>
           <span><kbd>Ctrl</kbd>+<kbd>Z</kbd> Undo</span>
           <span><kbd>?</kbd> Help</span>
           <span><kbd>W</kbd> Pin desktop</span>

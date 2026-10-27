@@ -57,7 +57,6 @@ var arm = null;
 var hoverDate = null;
 var focusDate = null;
 var gesture = null;
-var createDrag = null;
 var boardDrag = null;
 var flingId = 0;
 var pointerXY = null;
@@ -535,7 +534,8 @@ document.addEventListener("keydown", function (event) {
       return;
     }
   }
-  if (event.key === "Escape" && gesture) {
+  if (event.key === "Escape" && (gesture || rangeDrag)) {
+    rangeDrag = null;
     gesture = null;
     clearDrop();
     hideFloater();
@@ -555,6 +555,7 @@ document.addEventListener("keydown", function (event) {
   var importMode = document.getElementById("import-mode");
   if (event.key === "Escape" && importMode && importMode.open) return;
   if (event.key === "Escape" && !dialog.open) {
+    rangeDrag = null;
     selection = null;
     arm = null;
     hoverDate = null;
@@ -563,6 +564,14 @@ document.addEventListener("keydown", function (event) {
     paintSelection();
     paintFocus();
     board.querySelectorAll(".bar.selected").forEach(function (bar) { bar.classList.remove("selected"); });
+    return;
+  }
+  if (event.shiftKey && !event.altKey && !event.ctrlKey && !event.metaKey
+      && (event.key === "ArrowLeft" || event.key === "ArrowRight")
+      && selection && !selectedId && !dialog.open && !(help && help.open)
+      && (!quickEdit || quickEdit.hidden)) {
+    event.preventDefault();
+    nudgeQuickRange(event.key === "ArrowLeft" ? -1 : 1);
     return;
   }
   if (typing || dialog.open || help.open) return;
@@ -582,9 +591,9 @@ document.addEventListener("keydown", function (event) {
     event.preventDefault();
     if (typeof toggleFullscreen === "function") toggleFullscreen();
   } else if (event.key === "[") {
-    scrollToMonth(Math.max(RANGE_START, year - 1), 1, true);
+    if (year > RANGE_START) scrollToMonth(year - 1, 1, true);
   } else if (event.key === "]") {
-    scrollToMonth(Math.min(RANGE_END, year + 1), 1, true);
+    if (year < RANGE_END) scrollToMonth(year + 1, 1, true);
   } else if (event.key === "?" || (event.key === "/" && event.shiftKey)) {
     event.preventDefault();
     openHelp("shortcuts");
@@ -613,6 +622,10 @@ document.addEventListener("keydown", function (event) {
     if ((event.key === "ArrowUp" || event.key === "ArrowDown") && (event.shiftKey || !focusDate)) {
       event.preventDefault();
       scrollByMonths(event.key === "ArrowUp" ? -1 : 1);
+      return;
+    }
+    if (event.shiftKey && selection && !selectedId && (event.key === "ArrowLeft" || event.key === "ArrowRight")) {
+      nudgeQuickRange(event.key === "ArrowLeft" ? -1 : 1);
       return;
     }
     event.preventDefault();
@@ -660,8 +673,8 @@ function onPointerCancel() {
     if (flingId) cancelAnimationFrame(flingId);
     flingId = 0;
   }
-  var dragging = !!(gesture || (createDrag && createDrag.moved));
-  createDrag = null;
+  var dragging = !!(gesture || (rangeDrag && rangeDrag.moved));
+  rangeDrag = null;
   gesture = null;
   hideFloater();
   clearDrop();
@@ -732,6 +745,7 @@ board.addEventListener("pointerdown", function (event) {
     if (singlePlan && singlePlan.source === "gcal") return;
     gesture = {
       kind: "plan",
+      where: "body",
       mode: "move",
       single: true,
       id: singleMark.dataset.id,
@@ -755,9 +769,6 @@ board.addEventListener("pointerdown", function (event) {
     onBarDown(event);
     return;
   }
-  var cell = event.target.closest && event.target.closest(".cell[data-date]");
-  if (!cell) return;
-  createDrag = { iso: cell.dataset.date, x: event.clientX, y: event.clientY, moved: false };
 });
 board.addEventListener("pointerover", function (event) {
   var mark = event.target.closest && event.target.closest(".bar.single, .single-more");
@@ -787,6 +798,11 @@ board.addEventListener("scroll", function () {
   requestAnimationFrame(function () {
     board.dataset.ticking = "";
     updateViewYear();
+    if (typeof placeQuickAdd === "function") placeQuickAdd();
+    if (typeof placeSelectionHandle === "function") placeSelectionHandle();
+    if (awayPop && !awayPop.hidden && awayReturn && awayReturn.isConnected && typeof placeAwayPop === "function") {
+      placeAwayPop(awayReturn);
+    }
   });
 });
 
@@ -801,7 +817,7 @@ document.addEventListener("pointerdown", function (event) {
   }
   if (actionEl.hidden) return;
   if (actionEl.contains(event.target)) return;
-  if (event.target.closest && event.target.closest(".cell[data-date], .bar, .month, .year-divider, .single-more, #add, #today, #today-title, #day-list")) return;
+  if (event.target.closest && event.target.closest(".cell[data-date], .bar, .month, .year-divider, .single-more, #add, #today, #today-title, #day-list, #range-handle")) return;
   selection = null;
   arm = null;
   hoverDate = null;

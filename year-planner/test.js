@@ -55,3 +55,12 @@ if (bridgeTest.error) {
   process.stdout.write(bridgeTest.stdout || "");
   if (bridgeTest.status !== 0) process.exit(1);
 }
+
+var barposTest = child.spawnSync("python3", [path.join(__dirname, "test-barpos.py")], { encoding: "utf8" });
+if (barposTest.error) {
+  console.log("bar position check skipped (python3 not found)");
+} else {
+  process.stderr.write(barposTest.stderr || "");
+  process.stdout.write(barposTest.stdout || "");
+  if (barposTest.status !== 0) process.exit(1);
+}
