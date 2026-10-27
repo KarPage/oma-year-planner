@@ -1,0 +1,41 @@
+# test-bridge.py sets XDG_RUNTIME_DIR to a temp directory and stubs hyprctl
+# and chromium, so this job does not install Hyprland or a browser. The token,
+# argv, and /proc checks still run. Cleanup uses ss from iproute2, which is
+# already on ubuntu-latest.
+
+name: Test
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out
+        uses: actions/checkout@v7
+
+      - name: Set up Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: lts/*
+          package-manager-cache: false
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.x"
+
+      - name: Planner tests
+        working-directory: year-planner
+        run: node test.js
+
+      - name: Bridge tests
+        working-directory: year-planner
+        run: python3 test-bridge.py
