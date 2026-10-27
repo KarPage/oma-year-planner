@@ -894,6 +894,9 @@ label.search input::placeholder {
 .calendar {
   --month-h: calc((100dvh - 16rem) / 12);
   --month-h: max(0px, calc((100cqh - var(--head) - 22px) / 12));
+  --bar-h: 14px;
+  --bar-gap: 4px;
+  --bar-inset: 8px;
   grid-auto-rows: auto;
   overflow-x: clip;
   font-family: var(--mono);
@@ -971,7 +974,7 @@ label.search input::placeholder {
 
 .cell, .month, .month-total {
   min-width: 0;
-  height: max(var(--month-h), calc(20px + var(--chip-rows, 0) * 16px + 22px));
+  height: max(var(--month-h), calc(14px + var(--chip-rows, 0) * 16px + var(--lanes, 1) * var(--bar-h) + (var(--lanes, 1) - 1) * var(--bar-gap) + var(--bar-inset)));
 }
 .cell { position: relative; overflow: hidden; }
 .cell[data-date] { cursor: pointer; touch-action: none; }
@@ -1110,8 +1113,9 @@ label.search input::placeholder {
   position: absolute;
   left: 4px;
   right: 4px;
-  top: calc(var(--chip-band, 0px) + ((100% - var(--chip-band, 0px)) - max(12px, (100% - var(--chip-band, 0px)) * 0.6 / var(--lanes) - 4px)) / 2 + (100% - var(--chip-band, 0px)) * 0.6 * var(--lane) / var(--lanes));
-  height: max(12px, calc((100% - var(--chip-band, 0px)) * 0.6 / var(--lanes) - 4px));
+  top: auto;
+  bottom: calc(var(--bar-inset) + (var(--lanes, 1) - 1 - var(--lane, 0)) * (var(--bar-h) + var(--bar-gap)));
+  height: var(--bar-h);
   min-height: 0;
   display: flex;
   align-items: center;
@@ -1139,13 +1143,16 @@ label.search input::placeholder {
     color-mix(in srgb, var(--cat, var(--accent)) 25%, transparent) var(--progress, 0%));
 }
 .bar.is-past:not(.single):not(.is-brief) .fill {
-  filter: grayscale(0.85);
+  filter: none;
   opacity: 1;
-  color: color-mix(in srgb, var(--fg) 65%, var(--bg));
+  background: color-mix(in srgb, var(--muted) 26%, var(--bg));
+  border-color: color-mix(in srgb, var(--fg) 16%, var(--bg));
+  color: color-mix(in srgb, var(--fg) 46%, var(--bg));
+  box-shadow: inset 3px 0 0 color-mix(in srgb, var(--muted) 75%, var(--bg));
 }
 .bar.is-past .pill {
-  color: color-mix(in srgb, var(--fg) 65%, var(--bg));
-  border-color: color-mix(in srgb, var(--fg) 40%, var(--bg));
+  color: color-mix(in srgb, var(--fg) 46%, var(--bg));
+  border-color: color-mix(in srgb, var(--fg) 20%, var(--bg));
 }
 .bar.is-next:not(.is-brief):not(.single) .fill {
   outline: 1px solid var(--accent);
@@ -1178,6 +1185,8 @@ label.search input::placeholder {
   align-items: center;
   gap: 0;
   padding: 0 4px;
+  font-size: 12px;
+  line-height: 1;
 }
 .bar:not(.single):not(.is-brief) .label-slot {
   grid-column: var(--slot-from, 1) / span var(--slot-span, var(--span, 1));
@@ -1212,14 +1221,14 @@ label.search input::placeholder {
 .fill .pill {
   display: inline-flex;
   align-items: center;
-  padding: 1px 6px;
+  padding: 0 4px;
   border: 1px solid color-mix(in srgb, currentColor 55%, transparent);
   border-radius: 0;
   background: transparent;
   color: inherit;
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 600;
-  line-height: 1.3;
+  line-height: 12px;
   letter-spacing: 0.01em;
   -webkit-font-smoothing: antialiased;
 }
@@ -1235,9 +1244,19 @@ label.search input::placeholder {
     color-mix(in srgb, var(--cat, var(--accent)) 50%, transparent) var(--progress, 0%),
     color-mix(in srgb, var(--cat, var(--accent)) 35%, transparent) var(--progress, 0%));
 }
-.bar.is-past:not(.single):not(.is-brief):hover .fill {
-  filter: grayscale(0.85);
+.bar.is-past:not(.single):not(.is-brief):is(:hover, .selected) .fill {
+  filter: none;
   opacity: 1;
+  background: color-mix(in srgb, var(--cat, var(--accent)) 35%, transparent);
+  border-color: color-mix(in srgb, var(--cat, var(--accent)) 70%, transparent);
+  color: var(--fg);
+  box-shadow:
+    inset 3px 0 0 var(--cat, var(--accent)),
+    inset 0 1px 0 color-mix(in srgb, white 40%, transparent);
+}
+.bar.is-past:is(:hover, .selected, .is-linked) .pill {
+  color: inherit;
+  border-color: color-mix(in srgb, currentColor 55%, transparent);
 }
 .bar.selected .fill {
   outline: 1px solid var(--accent);
@@ -1324,6 +1343,44 @@ label.search input::placeholder {
   opacity: 0.72;
   color: var(--fg);
 }
+.bar.is-past:not(.single):not(.is-brief):is(.cont-before, .cont-after) .fill {
+  color: color-mix(in srgb, var(--fg) 46%, var(--bg));
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+}
+.bar.is-past:is(.cont-before, .cont-after) .fill::before {
+  background: color-mix(in srgb, var(--muted) 26%, var(--bg));
+  border-color: color-mix(in srgb, var(--fg) 16%, var(--bg));
+  box-shadow: inset 3px 0 0 color-mix(in srgb, var(--muted) 75%, var(--bg));
+}
+.bar.is-past.cont-before .fill::before {
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--fg) 10%, transparent);
+}
+.bar.is-past:is(.cont-before, .cont-after) .edge {
+  color: color-mix(in srgb, var(--fg) 46%, var(--bg));
+}
+.bar.is-past:not(.single):not(.is-brief):is(.cont-before, .cont-after):is(:hover, .is-linked, .selected) .fill {
+  color: var(--fg);
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+}
+.bar.is-past:is(.cont-before, .cont-after):is(:hover, .is-linked, .selected) .fill::before {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--cat, var(--accent)) 42%, transparent);
+  box-shadow:
+    inset 0 0 0 1px var(--accent),
+    inset 0 1px 0 color-mix(in srgb, white 40%, transparent);
+}
+.bar.is-past.cont-after:not(.cont-before):is(:hover, .is-linked, .selected) .fill::before {
+  box-shadow:
+    inset 3px 0 0 var(--cat, var(--accent)),
+    inset 0 0 0 1px var(--accent);
+}
+.bar.is-past:is(.cont-before, .cont-after):is(:hover, .is-linked, .selected) .edge {
+  color: var(--fg);
+}
 .bar.cont-before .edge.before { left: max(6px, calc(var(--fade) / 2 - 0.4em)); }
 .bar.cont-after .edge.after { right: max(6px, calc(var(--fade) / 2 - 0.4em)); }
 .bar.label-off .label-slot { visibility: hidden; }
@@ -1376,7 +1433,8 @@ label.search input::placeholder {
 .bar.is-brief .fill {
   left: 50%;
   right: auto;
-  top: calc(max(16px, var(--chip-band, 0px)) + var(--lane, 0) * 12px);
+  top: auto;
+  bottom: calc(var(--bar-inset) + (var(--bar-h) - 10px) / 2 + (var(--lanes, 1) - 1 - var(--lane, 0)) * (var(--bar-h) + var(--bar-gap)));
   width: 10px;
   height: 10px;
   min-height: 0;
@@ -1396,11 +1454,17 @@ label.search input::placeholder {
   position: absolute;
   inset: -12px;
 }
-.bar.is-brief.is-past .fill,
-.bar.single.is-past .fill {
-  filter: grayscale(0.85);
-  opacity: 0.45;
+.bar.is-brief.is-past .fill {
+  filter: none;
+  opacity: 1;
+  background: color-mix(in srgb, var(--muted) 72%, var(--bg));
   box-shadow: 0 0 0 1px var(--bg);
+}
+.bar.is-brief.is-past:is(:hover, .selected) .fill {
+  background: var(--cat, var(--accent));
+  box-shadow:
+    0 0 0 1px var(--bg),
+    0 0 8px color-mix(in srgb, var(--cat, var(--accent)) 80%, transparent);
 }
 .bar.single.is-next .fill,
 .bar.is-brief.is-next .fill {
@@ -2021,7 +2085,7 @@ textarea {
   align-self: start;
   z-index: 5;
   width: auto;
-  height: 15px;
+  height: 14px;
   min-height: 0;
   margin: calc(16px + var(--slot, 0) * 16px) 1px 0;
   display: block;
@@ -2074,8 +2138,24 @@ textarea {
 }
 .bar.single.is-past .fill {
   filter: none;
-  opacity: 0.55;
+  opacity: 1;
+  background: color-mix(in srgb, var(--muted) 32%, var(--bg));
+  border-color: color-mix(in srgb, var(--fg) 16%, var(--bg));
+  color: color-mix(in srgb, var(--fg) 46%, var(--bg));
   box-shadow: none;
+}
+.bar.single.is-past:is(:hover, .selected, :focus-visible) .fill {
+  opacity: 1;
+  background: color-mix(in srgb, var(--cat, var(--accent)) 46%, var(--bg));
+  border-color: color-mix(in srgb, var(--cat, var(--accent)) 75%, transparent);
+  color: var(--fg);
+  outline: 1px solid var(--accent);
+  outline-offset: -1px;
+}
+.single-more.is-past {
+  color: color-mix(in srgb, var(--fg) 46%, var(--bg));
+  border-color: color-mix(in srgb, var(--fg) 16%, var(--bg));
+  background: color-mix(in srgb, var(--muted) 18%, var(--bg));
 }
 .bar.single.is-today .fill { animation: none; }
 .bar.single:hover .fill,
@@ -2098,7 +2178,7 @@ textarea {
   align-self: start;
   z-index: 6;
   width: auto;
-  height: 15px;
+  height: 14px;
   margin: calc(16px + var(--slot, 0) * 16px) 1px 0;
   padding: 0 2px;
   border: 1px solid var(--line-strong);
@@ -2108,7 +2188,7 @@ textarea {
   font-family: var(--mono);
   font-size: 10px;
   font-weight: 700;
-  line-height: 13px;
+  line-height: 12px;
   text-align: center;
   overflow: hidden;
   cursor: pointer;
@@ -2322,7 +2402,7 @@ textarea {
   .dayhead-bar,
   .calendar { grid-template-columns: 5.4rem repeat(31, minmax(0, 1fr)) 3.1rem; }
   .month .name { font-size: 18px; }
-  .bar:not(.single):not(.is-brief) .fill { font-size: 14px; }
+  .bar:not(.single):not(.is-brief) .fill { font-size: 12px; }
   .bar:not(.single):is(:hover, :focus-within, .selected) .fill:has(.handle.w) { padding-left: 14px; }
   .bar:not(.single):is(:hover, :focus-within, .selected) .fill:has(.handle.e) { padding-right: 14px; }
 }

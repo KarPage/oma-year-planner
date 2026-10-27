@@ -14,6 +14,8 @@
 - A single-day plan is a chip in its day, under the weekday letter and above the multi-day bars. Two fit in the day. A third becomes a +N chip that lists every plan that day. A narrow cell shows the initial. The name on a longer bar stays clear of those days.
 - The Away count toggles. The same month closes the summary, another month switches to it, and Esc or a click outside closes it. The open cell stays highlighted.
 - A plan that crosses a month fades out over about two days at the end of the row, and fades in the same way on the next row. The ‹ › stay small on that fade. Hovering or selecting either piece highlights both. The name stays on the longer piece, or on both when they are close in length, and it stays out of the fade.
+- Multi-day bars are one thin strip, the same height and the same distance from the bottom of the row, in every month. A row with single-day chips no longer shrinks the bar.
+- Plans that have already ended, including single-day chips, use the theme's muted colors. Hover or selection brings the plan color back. In-progress and upcoming plans stay in their own colors.
 
 ## 1.1.8
 

@@ -581,6 +581,7 @@ function syncBars() {
   board.querySelectorAll(".cell, .month, .month-total").forEach(function (el) {
     var ymKey = el.dataset.ym || (el.dataset.date ? el.dataset.date.slice(0, 7) : "");
     el.style.setProperty("--chip-rows", String(chipRowsByYm[ymKey] || 0));
+    el.style.setProperty("--lanes", String((laid.lanes && laid.lanes[ymKey]) || 1));
   });
   board.querySelectorAll(".bar:not(.single)").forEach(function (el) {
     var rows = chipRowsByYm[el.dataset.ym] || 0;
@@ -628,6 +629,7 @@ function syncBars() {
       var more = document.createElement("button");
       more.type = "button";
       more.className = "single-more";
+      if (iso < today) more.classList.add("is-past");
       more.dataset.date = iso;
       more.style.setProperty("--slot", String(stack.visible));
       more.style.gridColumn = column;
