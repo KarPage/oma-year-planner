@@ -68,10 +68,10 @@
           <path d="M6.5 3.5V6.5H3.5M9.5 3.5V6.5H12.5M6.5 12.5V9.5H3.5M9.5 12.5V9.5H12.5" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="square" stroke-linejoin="miter"/>
         </svg>
       </button>
-      <button class="icon-btn" id="pin-desk" type="button" aria-pressed="false" aria-label="Pin to desktop" title="Pin to desktop">
-        <svg viewBox="0 0 16 16" aria-hidden="true">
-          <path d="M6 1.5h4v2.8l1.8 2.2H4.2L6 4.3V1.5z" fill="none" stroke="currentColor" stroke-width="1.3"/>
-          <path d="M7.2 6.5h1.6V14" fill="none" stroke="currentColor" stroke-width="1.3"/>
+      <button class="icon-btn" id="pin-desk" type="button" aria-pressed="false" aria-expanded="false" aria-label="Pin to desktop" title="Pin to desktop">
+        <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
+          <rect class="pin-head" x="4.5" y="2.75" width="7" height="4.25" stroke="currentColor" stroke-width="1.3"/>
+          <path d="M8 7V13.25" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="square"/>
         </svg>
         <span id="pin-desk-label" class="sr-only">Pin to desktop</span>
       </button>
@@ -149,6 +149,17 @@
           </svg>
         </button>
       </div>
+    </div>
+  </div>
+
+  <div id="pin-confirm" class="pin-confirm" hidden role="dialog" aria-labelledby="pin-confirm-title">
+    <p id="pin-confirm-title" class="pin-confirm-title">Pin to desktop</p>
+    <p id="pin-confirm-body"></p>
+    <p id="pin-confirm-how" class="pin-confirm-how"></p>
+    <label class="pin-confirm-skip"><input id="pin-confirm-skip" type="checkbox"> Don't show this again</label>
+    <div class="pin-confirm-actions">
+      <button id="pin-confirm-cancel" class="ghost" type="button">Cancel</button>
+      <button id="pin-confirm-go" class="primary" type="button">Pin to desktop</button>
     </div>
   </div>
 
@@ -368,7 +379,7 @@
     </div>
     <p class="qe-gcal" id="qe-gcal" hidden></p>
     <a class="qe-gcal-link" id="qe-gcal-link" target="_blank" rel="noopener noreferrer" hidden>Open in Google Calendar</a>
-    <p class="qe-tip">Tip: drag the marker to another day to move it.</p>
+    <p class="qe-tip">Tip: drag the chip onto another day to move it.</p>
   </div>
   <div class="away-pop" id="gcal-pop" hidden role="dialog" aria-modal="true" aria-label="Google Calendar" tabindex="-1"></div>
 

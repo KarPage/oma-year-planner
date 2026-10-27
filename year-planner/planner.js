@@ -392,6 +392,44 @@ var Planner = (function () {
     return "none";
   }
 
+  /* A body drag commits only after the pointer travels a full day cell,
+     across or down into the next row. A small slip stays a click. */
+  function moveCommit(dx, dy, cellWidth, cellHeight) {
+    if (!dragPastThreshold(dx, dy)) return false;
+    var across = cellWidth > 0 ? cellWidth : 32;
+    var down = cellHeight > 0 ? cellHeight : 48;
+    return Math.abs(dx) >= across || Math.abs(dy) >= down;
+  }
+
+  /* One or two single-day plans show as chips. A third becomes one chip
+     plus a +N counter, so a day never stacks more than two rows. */
+  function dayChipStack(count) {
+    var n = count | 0;
+    if (n <= 0) return { visible: 0, more: 0, rows: 0 };
+    if (n === 1) return { visible: 1, more: 0, rows: 1 };
+    if (n === 2) return { visible: 2, more: 0, rows: 2 };
+    return { visible: 1, more: n - 1, rows: 2 };
+  }
+
+  var CHIP_LABEL_MIN = 36;
+
+  function chipUsesInitial(cellWidth) {
+    return !(cellWidth >= CHIP_LABEL_MIN);
+  }
+
+  function chipInitial(title) {
+    var text = String(title || "").trim();
+    if (!text) return "";
+    return text.charAt(0).toUpperCase();
+  }
+
+  /* The header pin button asks first. Skip stores a local choice.
+     Already pinned asks to unpin, unless that choice says to act directly. */
+  function pinButtonAction(skipped, pinned) {
+    if (skipped) return pinned ? "unpin" : "pin";
+    return pinned ? "ask-unpin" : "ask-pin";
+  }
+
   /* The clicked day stays the anchor. The other end follows the pointer. */
   function selectionSpan(anchor, end) {
     if (!anchor || !parse(anchor)) return null;
@@ -1347,6 +1385,20 @@ var Planner = (function () {
     if (planGesture("body", true) !== "move") errors.push("gesture move");
     if (planGesture("start", true) !== "resize" || planGesture("end", true) !== "resize") errors.push("gesture resize");
     if (planGesture("away", true) !== "none") errors.push("gesture other");
+    if (moveCommit(10, 0, 40, 56) || moveCommit(5, 0, 40, 56) || moveCommit(39, 49, 40, 56)) errors.push("move short");
+    if (!moveCommit(40, 0, 40, 56) || !moveCommit(0, 56, 40, 56)) errors.push("move cell");
+    var oneChip = dayChipStack(1);
+    var twoChip = dayChipStack(2);
+    var fourChip = dayChipStack(4);
+    var noneChip = dayChipStack(0);
+    if (oneChip.visible !== 1 || oneChip.more !== 0 || oneChip.rows !== 1) errors.push("chip one");
+    if (twoChip.visible !== 2 || twoChip.more !== 0 || twoChip.rows !== 2) errors.push("chip two");
+    if (fourChip.visible !== 1 || fourChip.more !== 3 || fourChip.rows !== 2) errors.push("chip more");
+    if (noneChip.visible !== 0 || noneChip.rows !== 0) errors.push("chip none");
+    if (!chipUsesInitial(35) || chipUsesInitial(36) || chipUsesInitial(80)) errors.push("chip narrow");
+    if (chipInitial("soccer") !== "S" || chipInitial("  tx ") !== "T" || chipInitial("") !== "") errors.push("chip initial");
+    if (pinButtonAction(false, false) !== "ask-pin" || pinButtonAction(false, true) !== "ask-unpin") errors.push("pin ask");
+    if (pinButtonAction(true, false) !== "pin" || pinButtonAction(true, true) !== "unpin") errors.push("pin skip");
     var oneDay = selectionSpan("2026-10-26", "2026-10-26");
     if (!oneDay || oneDay.start !== "2026-10-26" || oneDay.end !== "2026-10-26" || oneDay.edge !== "end") errors.push("select one");
     var grown = extendSelection(oneDay, "2026-11-02");
@@ -1698,6 +1750,11 @@ var Planner = (function () {
     placeNear: placeNear,
     dragPastThreshold: dragPastThreshold,
     planGesture: planGesture,
+    moveCommit: moveCommit,
+    dayChipStack: dayChipStack,
+    chipUsesInitial: chipUsesInitial,
+    chipInitial: chipInitial,
+    pinButtonAction: pinButtonAction,
     selectionSpan: selectionSpan,
     extendSelection: extendSelection,
     nudgeSelection: nudgeSelection,

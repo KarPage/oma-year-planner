@@ -502,6 +502,8 @@ function syncBars() {
     el.style.gridRow = host.dataset.row;
     el.style.setProperty("--lane", String(bar.lane));
     el.style.setProperty("--lanes", String(laid.lanes[ym] || 1));
+    el.style.setProperty("--chip-rows", "0");
+    el.style.setProperty("--chip-band", "0px");
     el.dataset.id = plan.id;
     el.dataset.ym = ym;
     el.dataset.start = String(bar.startDay);
@@ -554,36 +556,55 @@ function syncBars() {
     el.append(fill);
     calendar.append(el);
   });
+  var chipRowsByYm = Object.create(null);
+  Object.keys(groups).forEach(function (iso) {
+    var ymKey = iso.slice(0, 7);
+    var rows = Planner.dayChipStack(groups[iso].length).rows;
+    if (!chipRowsByYm[ymKey] || rows > chipRowsByYm[ymKey]) chipRowsByYm[ymKey] = rows;
+  });
+  var planMonths = Object.create(null);
+  board.querySelectorAll(".bar:not(.single)").forEach(function (el) {
+    var id = el.dataset.id || "";
+    if (!planMonths[id]) planMonths[id] = [];
+    if (planMonths[id].indexOf(el.dataset.ym) < 0) planMonths[id].push(el.dataset.ym);
+  });
+  Object.keys(planMonths).forEach(function (id) {
+    var maxRows = 0;
+    planMonths[id].forEach(function (ymKey) {
+      if ((chipRowsByYm[ymKey] || 0) > maxRows) maxRows = chipRowsByYm[ymKey];
+    });
+    if (!maxRows) return;
+    planMonths[id].forEach(function (ymKey) {
+      if ((chipRowsByYm[ymKey] || 0) < maxRows) chipRowsByYm[ymKey] = maxRows;
+    });
+  });
+  board.querySelectorAll(".cell, .month, .month-total").forEach(function (el) {
+    var ymKey = el.dataset.ym || (el.dataset.date ? el.dataset.date.slice(0, 7) : "");
+    el.style.setProperty("--chip-rows", String(chipRowsByYm[ymKey] || 0));
+  });
+  board.querySelectorAll(".bar:not(.single)").forEach(function (el) {
+    var rows = chipRowsByYm[el.dataset.ym] || 0;
+    el.style.setProperty("--chip-rows", String(rows));
+    el.style.setProperty("--chip-band", rows ? (16 + rows * 16) + "px" : "0px");
+  });
   Object.keys(groups).forEach(function (iso) {
     var segs = groups[iso];
     var host = board.querySelector('.month[data-ym="' + iso.slice(0, 7) + '"]');
     if (!host || !segs.length) return;
-    if (segs.length >= 3) {
-      var more = document.createElement("button");
-      more.type = "button";
-      more.className = "single-more";
-      more.dataset.date = iso;
-      more.style.gridColumn = String(segs[0].startDay + 1);
-      more.style.gridRow = host.dataset.row;
-      more.textContent = String(segs.length);
-      more.setAttribute("aria-label", Planner.plural(segs.length, "plan") + " on " + shortDate(iso));
-      calendar.append(more);
-      return;
-    }
-    var mini = segs.length === 2;
-    for (var i = 0; i < segs.length; i++) {
+    var stack = Planner.dayChipStack(segs.length);
+    var column = String(segs[0].startDay + 1);
+    for (var i = 0; i < stack.visible; i++) {
       var plan = segs[i].plan;
       var tick = document.createElement("button");
       tick.type = "button";
       tick.className = "bar single";
-      if (mini) tick.classList.add("is-mini");
       if (plan.end < today) tick.classList.add("is-past");
       if (iso === today) tick.classList.add("is-today");
       if (rhythmNext && plan.id === rhythmNext.id) tick.classList.add("is-next");
       if (plan.id === selectedId) tick.classList.add("selected");
       tick.style.setProperty("--cat", plan.color || "#74a869");
       tick.style.setProperty("--slot", String(i));
-      tick.style.gridColumn = String(segs[i].startDay + 1);
+      tick.style.gridColumn = column;
       tick.style.gridRow = host.dataset.row;
       tick.dataset.id = plan.id;
       tick.dataset.date = iso;
@@ -591,16 +612,30 @@ function syncBars() {
       tick.setAttribute("aria-label", oneTip);
       tick.title = oneTip;
       var mark = document.createElement("span");
-      mark.className = "fill single";
+      mark.className = "fill";
+      var cap = document.createElement("span");
+      cap.className = "chip-label";
+      cap.textContent = plan.title;
+      var initial = document.createElement("span");
+      initial.className = "chip-initial";
+      initial.textContent = Planner.chipInitial(plan.title);
+      mark.append(cap, initial);
       tick.append(mark);
-      if (!mini) {
-        var cap = document.createElement("span");
-        cap.className = "mark-label";
-        cap.textContent = dotCaption(plan);
-        tick.append(cap);
-      }
       if (plan.source === "gcal") tick.classList.add("is-gcal");
       calendar.append(tick);
+    }
+    if (stack.more) {
+      var more = document.createElement("button");
+      more.type = "button";
+      more.className = "single-more";
+      more.dataset.date = iso;
+      more.style.setProperty("--slot", String(stack.visible));
+      more.style.gridColumn = column;
+      more.style.gridRow = host.dataset.row;
+      more.textContent = "+" + stack.more;
+      more.setAttribute("aria-label", "+" + stack.more + " more on " + shortDate(iso) + ", " + Planner.plural(segs.length, "plan"));
+      more.title = Planner.plural(segs.length, "plan") + " on " + shortDate(iso);
+      calendar.append(more);
     }
   });
   placeBarLabels();

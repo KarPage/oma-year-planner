@@ -105,6 +105,7 @@ function paintPin(pinned) {
 }
 
 function togglePin() {
+  if (typeof closePinConfirm === "function") closePinConfirm();
   var button = document.getElementById("pin-desk");
   if (pinBusy) return;
   pinBusy = true;
@@ -134,7 +135,84 @@ function togglePin() {
   });
 }
 
-document.getElementById("pin-desk").addEventListener("click", togglePin);
+var PIN_CONFIRM_KEY = "year-planner/pin-confirm";
+
+function pinConfirmSkipped() {
+  try { return localStorage.getItem(PIN_CONFIRM_KEY) === "skip"; } catch (err) { return false; }
+}
+
+function closePinConfirm() {
+  var pop = document.getElementById("pin-confirm");
+  var button = document.getElementById("pin-desk");
+  if (pop) pop.hidden = true;
+  if (button) button.setAttribute("aria-expanded", "false");
+}
+
+function placePinConfirm() {
+  var pop = document.getElementById("pin-confirm");
+  var button = document.getElementById("pin-desk");
+  if (!pop || pop.hidden || !button || typeof placeElement !== "function") return;
+  var box = button.getBoundingClientRect();
+  var placed = placeElement(pop, {
+    left: box.left,
+    right: box.right,
+    top: box.top,
+    bottom: box.bottom,
+    gap: 8,
+    fallbackWidth: 300,
+    fallbackHeight: 180
+  });
+  pop.classList.toggle("above", !!(placed && placed.flipped));
+  if (placed && placed.arrow != null) pop.style.setProperty("--arrow", Math.max(10, placed.arrow - 4) + "px");
+}
+
+function openPinConfirm() {
+  var pop = document.getElementById("pin-confirm");
+  var button = document.getElementById("pin-desk");
+  if (!pop || !button) return;
+  var pinned = button.getAttribute("aria-pressed") === "true";
+  var action = Planner.pinButtonAction(false, pinned);
+  document.getElementById("pin-confirm-title").textContent = action === "ask-unpin" ? "Unpin from desktop" : "Pin to desktop";
+  document.getElementById("pin-confirm-body").textContent = action === "ask-unpin"
+    ? "Puts your previous wallpaper back. The midnight repaint stops until you pin the planner again."
+    : "A still picture of this planner becomes your desktop wallpaper, behind your windows. Nothing on the picture clicks. It is painted again at midnight, and again when this window closes.";
+  document.getElementById("pin-confirm-how").textContent = "Unpin anytime from this button, the bar menu (W), or a right-click on the bar icon.";
+  document.getElementById("pin-confirm-go").textContent = action === "ask-unpin" ? "Unpin from desktop" : "Pin to desktop";
+  document.getElementById("pin-confirm-skip").checked = false;
+  pop.hidden = false;
+  button.setAttribute("aria-expanded", "true");
+  placePinConfirm();
+  document.getElementById("pin-confirm-go").focus();
+}
+
+function onPinButtonClick() {
+  var pop = document.getElementById("pin-confirm");
+  if (pop && !pop.hidden) {
+    closePinConfirm();
+    return;
+  }
+  var button = document.getElementById("pin-desk");
+  var pinned = !!(button && button.getAttribute("aria-pressed") === "true");
+  var action = Planner.pinButtonAction(pinConfirmSkipped(), pinned);
+  if (action === "pin" || action === "unpin") {
+    togglePin();
+    return;
+  }
+  openPinConfirm();
+}
+
+document.getElementById("pin-desk").addEventListener("click", onPinButtonClick);
+document.getElementById("pin-confirm-cancel").addEventListener("click", closePinConfirm);
+document.getElementById("pin-confirm-go").addEventListener("click", function () {
+  if (document.getElementById("pin-confirm-skip").checked) {
+    try { localStorage.setItem(PIN_CONFIRM_KEY, "skip"); } catch (err) { /* private mode */ }
+  }
+  closePinConfirm();
+  togglePin();
+});
+window.addEventListener("resize", function () {
+  if (typeof placePinConfirm === "function") placePinConfirm();
+});
 if (!bridgeToken && !window.OMA_WALLPAPER) paintPin(false);
 
 var wmFullscreen = false;

@@ -27,6 +27,7 @@ function onBarDown(event) {
   var plan = planById(bar.dataset.id);
   if (!plan || plan.source === "gcal") return;
   var where = event.target.dataset && event.target.dataset.resize ? event.target.dataset.resize : "body";
+  var cellBox = pointerCell();
   gesture = {
     kind: "plan",
     where: where,
@@ -37,8 +38,17 @@ function onBarDown(event) {
     grabDate: dateFromPoint(event.clientX, event.clientY) || plan.start,
     moved: false,
     x: event.clientX,
-    y: event.clientY
+    y: event.clientY,
+    cellWidth: cellBox.width,
+    cellHeight: cellBox.height
   };
+}
+
+function pointerCell() {
+  var cell = board.querySelector(".cell[data-date]");
+  if (!cell) return { width: 32, height: 48 };
+  var box = cell.getBoundingClientRect();
+  return { width: box.width || 32, height: box.height || 48 };
 }
 
 function onArmMove(event) {
@@ -82,10 +92,13 @@ function onPointerMove(event) {
   }
   if (!gesture) return;
   var iso = dateFromPoint(event.clientX, event.clientY);
-  if (!gesture.moved && !Planner.dragPastThreshold(event.clientX - gesture.x, event.clientY - gesture.y)) return;
+  var dx = event.clientX - gesture.x;
+  var dy = event.clientY - gesture.y;
   if (!gesture.moved) {
-    var kind = Planner.planGesture(gesture.where || "body", true);
+    var past = Planner.dragPastThreshold(dx, dy);
+    var kind = Planner.planGesture(gesture.where || "body", past);
     if (kind === "none") return;
+    if (kind === "move" && !Planner.moveCommit(dx, dy, gesture.cellWidth, gesture.cellHeight)) return;
     gesture.mode = kind === "resize" ? (gesture.where === "start" ? "start" : "end") : "move";
   }
   gesture.moved = true;

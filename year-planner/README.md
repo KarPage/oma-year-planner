@@ -14,7 +14,7 @@ Screenshots for a release live in [screenshots/](screenshots/). The wide shot sh
 - A plan that runs past the end of a month fades out over about two days and fades back in on the next row. The name stays on the longer piece.
 - A plan is a Trip, an Event, or a Reminder. Older plans with no type are treated as a trip when they cover more than one day, and as an event when they cover one day.
 - Days away counts trips only. That number is on the dashboard, at the end of each month, and in the Away popover.
-- One-day plans are small markers. Click one to edit the name, color, or type. A checklist can show progress on the bar, such as `Canada · 8d · 3/7`.
+- One-day plans are chips in the day cell. Two stack in the day. More than that shows a +N chip that lists them. Click one to edit the name, color, or type. A checklist can show progress on a longer bar, such as `Canada · 8d · 3/7`.
 - Notes can contain links. Up to four images can be attached. They are shrunk before they are stored.
 - Search, undo, and a dashboard strip. A wide window shows the next three plans. A narrow window keeps Next and Up next on one line.
 - JSON backup, with or without images, and `.ics` import and export. A file over 20 MB is refused. Import can replace the list or merge into it.
@@ -49,7 +49,7 @@ A still picture of the board, laid over the desktop. Nothing on it clicks or mov
 ./wallpaper status    say whether it is pinned
 ```
 
-In the planner, the pin icon does the same thing. Press `W`, or `Super+Shift+Y` from anywhere.
+In the planner, the pin icon asks first, then does the same thing. Press `W`, or use the bar menu, to pin or unpin without the question. `Super+Shift+Y` does it from anywhere once that shortcut is installed.
 
 Left-click the bar icon for a small menu: open the planner, pin or unpin, full screen, refresh the pinned picture, choose **Bar position**, or quit. Right-click pins or unpins straight away.
 

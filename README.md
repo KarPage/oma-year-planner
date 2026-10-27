@@ -23,7 +23,7 @@
 - **Matches your Omarchy theme.** The planner reads the colors from your active theme each time it opens.
 - **Bar menu.** Left-click the bar button for a small menu: **Open planner**, **Pin to desktop** (or **Unpin**), **Full screen**, **Refresh desktop snapshot**, **Bar position** (Left, Center, or Right), and a red **Quit Year Planner** button. Right-click (or middle-click) pins or unpins straight away. A small dot on the button shows while it is pinned. Bar position moves this plugin in the Omarchy shell and, if the module is already there, in Waybar. The config is backed up first.
 - **Quit.** **Quit Year Planner** closes the planner windows and stops the pin helper. It never closes other browser windows, and it leaves a pinned picture and its midnight repaint alone.
-- **Pin to desktop.** A still picture of your year, laid over your wallpaper and painted again at midnight. Pin or unpin it with the pin icon at the right of the header (after full screen, before **+ Add plan**), the `W` key, a right-click on the bar button, or an optional `Super+Shift+Y` shortcut. Nothing on the picture clicks or moves.
+- **Pin to desktop.** A still picture of your year, laid over your wallpaper and painted again at midnight. The pin icon at the right of the header (after full screen, before **+ Add plan**) asks first. The `W` key, the bar menu, and a right-click on the bar button pin or unpin straight away, and so does an optional `Super+Shift+Y` shortcut. Nothing on the picture clicks or moves.
 - **Google Calendar, if you want it.** Optional and read-only. It is off by default. You bring your own Google OAuth client id and run `./serve`. See [year-planner/README.md](year-planner/README.md#google-calendar).
 
 ## Screenshots

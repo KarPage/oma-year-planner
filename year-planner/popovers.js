@@ -72,6 +72,10 @@ function openDayList(iso, anchor) {
   hideTip();
   dayList.hidden = false;
   dayList.replaceChildren();
+  var head = document.createElement("p");
+  head.className = "day-list-title";
+  head.textContent = shortDate(iso);
+  dayList.append(head);
   list.forEach(function (plan) {
     var row = document.createElement("div");
     row.className = "day-list-row";

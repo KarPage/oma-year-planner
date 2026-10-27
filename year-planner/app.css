@@ -285,10 +285,66 @@ h1.today-headline {
 #pin-desk {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  justify-content: center;
+  padding: 0;
+  line-height: 0;
+  gap: 0;
 }
 #pin-desk svg { width: 16px; height: 16px; display: block; flex: none; }
+#pin-desk .pin-head { fill: none; }
+#pin-desk[aria-pressed="true"] .pin-head { fill: currentColor; }
 #pin-desk:disabled { opacity: 0.55; }
+.pin-confirm {
+  position: fixed;
+  z-index: 45;
+  width: min(300px, calc(100vw - 16px));
+  padding: 12px 12px 10px;
+  border: 1px solid var(--line-strong);
+  background: var(--bg);
+  color: var(--fg);
+  box-shadow: none;
+}
+.pin-confirm[hidden] { display: none; }
+.pin-confirm-title {
+  margin: 0 0 8px;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0;
+}
+.pin-confirm p { margin: 0 0 8px; font-size: 13px; line-height: 1.4; color: var(--fg); }
+.pin-confirm-how { color: var(--muted); }
+.pin-confirm-skip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 0 12px;
+  font-size: 13px;
+  color: var(--fg);
+}
+.pin-confirm-skip input { width: 14px; height: 14px; margin: 0; accent-color: var(--accent); }
+.pin-confirm-actions { display: flex; justify-content: flex-end; gap: 8px; }
+.pin-confirm-actions .ghost,
+.pin-confirm-actions .primary { height: 32px; padding: 0 12px; }
+.pin-confirm::before {
+  content: "";
+  position: absolute;
+  top: -5px;
+  left: var(--arrow, 24px);
+  width: 8px;
+  height: 8px;
+  background: var(--bg);
+  border-left: 1px solid var(--line-strong);
+  border-top: 1px solid var(--line-strong);
+  transform: rotate(45deg);
+}
+.pin-confirm.above::before {
+  top: auto;
+  bottom: -5px;
+  border-left: 0;
+  border-top: 0;
+  border-right: 1px solid var(--line-strong);
+  border-bottom: 1px solid var(--line-strong);
+}
 .toast {
   position: fixed;
   left: 50%;
@@ -913,7 +969,10 @@ label.search input::placeholder {
   color: color-mix(in srgb, var(--fg) 40%, var(--bg));
 }
 
-.cell, .month, .month-total { min-width: 0; height: var(--month-h); }
+.cell, .month, .month-total {
+  min-width: 0;
+  height: max(var(--month-h), calc(20px + var(--chip-rows, 0) * 16px + 22px));
+}
 .cell { position: relative; overflow: hidden; }
 .cell[data-date] { cursor: pointer; touch-action: none; }
 .month, .year-divider { cursor: grab; touch-action: none; }
@@ -1051,8 +1110,8 @@ label.search input::placeholder {
   position: absolute;
   left: 4px;
   right: 4px;
-  top: calc((100% - (60% / var(--lanes) - 4px)) / 2 + 60% * var(--lane) / var(--lanes));
-  height: max(10px, calc(60% / var(--lanes) - 4px));
+  top: calc(var(--chip-band, 0px) + ((100% - var(--chip-band, 0px)) - max(12px, (100% - var(--chip-band, 0px)) * 0.6 / var(--lanes) - 4px)) / 2 + (100% - var(--chip-band, 0px)) * 0.6 * var(--lane) / var(--lanes));
+  height: max(12px, calc((100% - var(--chip-band, 0px)) * 0.6 / var(--lanes) - 4px));
   min-height: 0;
   display: flex;
   align-items: center;
@@ -1317,7 +1376,7 @@ label.search input::placeholder {
 .bar.is-brief .fill {
   left: 50%;
   right: auto;
-  top: calc(16px + var(--lane, 0) * 12px);
+  top: calc(max(16px, var(--chip-band, 0px)) + var(--lane, 0) * 12px);
   width: 10px;
   height: 10px;
   min-height: 0;
@@ -1508,6 +1567,14 @@ label.search input::placeholder {
   color: var(--accent);
   font-size: 13px;
   font-weight: 600;
+}
+#undo.is-fresh {
+  height: 32px;
+  padding: 0 14px;
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--bg);
+  font-weight: 700;
 }
 #undo[hidden] { display: none; }
 .backup { display: flex; gap: 14px; margin-left: auto; }
@@ -1954,63 +2021,72 @@ textarea {
   align-self: start;
   z-index: 5;
   width: auto;
-  height: 10px;
+  height: 15px;
   min-height: 0;
-  margin: 3px 0 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
+  margin: calc(16px + var(--slot, 0) * 16px) 1px 0;
+  display: block;
   container-type: inline-size;
-  container-name: daydot;
-  overflow: visible;
+  container-name: chip;
+  overflow: hidden;
   pointer-events: auto;
   cursor: grab;
+  background: transparent;
+  border: 0;
+  padding: 0;
 }
 .bar.single.is-gcal { cursor: default; }
-.bar.single .mark-label {
-  display: none;
-  overflow: hidden;
-  white-space: nowrap;
-  font-size: 11px;
-  font-weight: 600;
-  line-height: 1;
-  color: var(--fg);
-  pointer-events: none;
-}
-.bar.single.is-mini {
-  height: 8px;
-  margin-top: 16px;
-  transform: translateY(calc(var(--slot, 0) * 9px));
-}
-.bar.single.is-mini .mark-label { display: none; }
-@container daydot (min-width: 46px) {
-  .mark-label.mark-label.mark-label { display: block; }
-}
-.bar.single .mark-label.is-hidden { display: none; }
-.bar.single .g-mark { display: none; }
 .bar.single .fill {
-  position: relative;
-  inset: auto;
-  flex: none;
-  width: 10px;
-  height: 10px;
+  position: absolute;
+  inset: 0;
+  width: auto;
+  height: auto;
   min-height: 0;
-  padding: 0;
-  border: 0;
-  border-radius: 50%;
-  background: var(--cat, var(--accent));
-  box-shadow:
-    0 0 0 1px var(--bg),
-    0 0 6px color-mix(in srgb, var(--cat, var(--accent)) 70%, transparent);
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  margin: 0;
+  padding: 0 3px;
+  border: 1px solid color-mix(in srgb, var(--cat, var(--accent)) 75%, transparent);
+  border-radius: 0;
+  background: color-mix(in srgb, var(--cat, var(--accent)) 32%, var(--bg));
+  box-shadow: none;
+  overflow: hidden;
   pointer-events: none;
+  cursor: inherit;
 }
-.bar.single.is-mini .fill {
-  width: 6px;
-  height: 6px;
+.bar.single .chip-label,
+.bar.single .chip-initial {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font);
+  font-size: 10px;
+  font-weight: 650;
+  line-height: 1;
+  letter-spacing: 0;
+  color: var(--fg);
+}
+.bar.single .chip-initial { display: none; width: 100%; text-align: center; }
+@container chip (max-width: 35px) {
+  .bar.single .chip-label { display: none; }
+  .bar.single .chip-initial { display: block; }
+}
+.bar.single.is-past .fill {
+  filter: none;
+  opacity: 0.55;
+  box-shadow: none;
 }
 .bar.single.is-today .fill { animation: none; }
 .bar.single:hover .fill,
+.bar.single.selected .fill,
+.bar.single:focus-visible .fill,
+.bar.single.is-next .fill {
+  outline: 1px solid var(--accent);
+  outline-offset: -1px;
+  background: color-mix(in srgb, var(--cat, var(--accent)) 46%, var(--bg));
+  box-shadow: none;
+}
 .bar.is-brief:hover .fill {
   background: var(--cat, var(--accent));
   box-shadow:
@@ -2018,12 +2094,13 @@ textarea {
     0 0 8px color-mix(in srgb, var(--cat, var(--accent)) 80%, transparent);
 }
 .single-more {
-  place-self: center;
+  justify-self: stretch;
+  align-self: start;
   z-index: 6;
-  width: 16px;
-  height: 14px;
-  margin: 0;
-  padding: 0;
+  width: auto;
+  height: 15px;
+  margin: calc(16px + var(--slot, 0) * 16px) 1px 0;
+  padding: 0 2px;
   border: 1px solid var(--line-strong);
   border-radius: 0;
   background: var(--bg);
@@ -2031,8 +2108,17 @@ textarea {
   font-family: var(--mono);
   font-size: 10px;
   font-weight: 700;
-  line-height: 12px;
+  line-height: 13px;
+  text-align: center;
+  overflow: hidden;
   cursor: pointer;
+}
+.single-more:hover,
+.single-more:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: -1px;
+  border-color: var(--accent);
+  color: var(--accent);
 }
 .range-floater, .tip {
   position: fixed;
@@ -2058,6 +2144,15 @@ textarea {
   border: 1px solid var(--line-strong);
   background: var(--bg);
   border-radius: 0;
+}
+.day-list-title {
+  margin: 0;
+  padding: 4px 8px 2px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 .day-list-row { display: flex; align-items: center; gap: 4px; }
 .day-list-pick {

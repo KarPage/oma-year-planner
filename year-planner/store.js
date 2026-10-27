@@ -298,10 +298,14 @@ function todayParts() {
 
 function setStatus(text) {
   statusEl.textContent = text || "";
+  paintUndo();
 }
 
 function paintUndo() {
+  var fresh = /^Moved /.test(statusEl.textContent || "");
   undoBtn.hidden = undoStack.length === 0;
+  undoBtn.classList.toggle("is-fresh", !undoBtn.hidden && fresh);
+  undoBtn.textContent = !undoBtn.hidden && fresh ? "Undo move" : "Undo";
 }
 
 function planMeta(plan) {
@@ -496,6 +500,12 @@ document.addEventListener("keydown", function (event) {
     } else {
       search.blur();
     }
+    return;
+  }
+  var pinConfirm = document.getElementById("pin-confirm");
+  if (pinConfirm && !pinConfirm.hidden && event.key === "Escape") {
+    event.preventDefault();
+    if (typeof closePinConfirm === "function") closePinConfirm();
     return;
   }
   if (awayPop && !awayPop.hidden && event.key === "Escape") {
@@ -743,6 +753,8 @@ board.addEventListener("pointerdown", function (event) {
   if (singleMark) {
     var singlePlan = planById(singleMark.dataset.id);
     if (singlePlan && singlePlan.source === "gcal") return;
+    var singleCell = board.querySelector(".cell[data-date]");
+    var singleBox = singleCell ? singleCell.getBoundingClientRect() : null;
     gesture = {
       kind: "plan",
       where: "body",
@@ -754,7 +766,9 @@ board.addEventListener("pointerdown", function (event) {
       grabDate: singleMark.dataset.date,
       moved: false,
       x: event.clientX,
-      y: event.clientY
+      y: event.clientY,
+      cellWidth: singleBox && singleBox.width ? singleBox.width : 32,
+      cellHeight: singleBox && singleBox.height ? singleBox.height : 48
     };
     return;
   }
@@ -808,6 +822,10 @@ board.addEventListener("scroll", function () {
 
 document.addEventListener("pointerdown", function (event) {
   pointerXY = { x: event.clientX, y: event.clientY };
+  var pinConfirm = document.getElementById("pin-confirm");
+  if (pinConfirm && !pinConfirm.hidden && !pinConfirm.contains(event.target) && !(event.target.closest && event.target.closest("#pin-desk"))) {
+    if (typeof closePinConfirm === "function") closePinConfirm();
+  }
   if (awayPop && !awayPop.hidden && !awayPop.contains(event.target) && !(event.target.closest && event.target.closest(".away-head, .month-total"))) {
     closeAwayPop(false);
   }
