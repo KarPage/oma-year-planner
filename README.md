@@ -5,14 +5,15 @@
 <p align="center"><b>Your whole year on one screen. A local-first year calendar for Omarchy, with no backend, no account and no build step.</b></p>
 
 <p align="center">
-  <img src="preview.png" alt="Oma Year Planner showing a full year of trips and events" width="960">
+  <img src="preview.png" alt="Full year board of demo trips and events, with past months dimmed and thin bars wrapping between months" width="960">
 </p>
 
 ## Features
 
 - **Whole year at a glance.** Months run down one scrolling board. The day header stays pinned while the months scroll. "Rolling 12" starts at the current month, and **Today** brings the current month back to the middle.
 - **Past fades back.** Past months and finished plans dim, so what is ahead stands out.
-- **Fast planning.** Click a day to add a plan. Drag the handle to extend the range. Drag a bar to move a plan, or drag its ends to resize it.
+- **Fast planning.** Click a day to open quick add, name the plan, attach a photo, and pick Plan or Trip. Drag the handle to extend the range. Drag a bar to move a plan, or drag its ends to resize it.
+- **Thin month-wrap bars.** A plan that crosses a month stays one thin strip. It fades out at the end of the row and fades back in on the next, and the name stays on the longer piece.
 - **Trips, events and reminders.** One-day plans show as small markers. Trips add up to a "days away" count per month and for the year.
 - **Dashboard strip.** Counts for plans, trips and days away, then Next, Up next and Last. A wide window shows three Upcoming plans. A narrow window keeps Next, Up next and Last on one line.
 - **Time and place.** A plan can be all day or have a start and end time, plus an optional place. The place opens in Maps only when you click it. Times and places go along with calendar files and Google Calendar.
@@ -32,11 +33,8 @@ All plans in these shots are demo data.
 
 | | |
 |---|---|
-| <img src="screenshots/fullscreen.png" alt="Full-screen board with Next and three Upcoming plans" width="460"><br>**Full screen.** A wide window shows Next plus three Upcoming plans. | <img src="screenshots/window.png" alt="Normal window with Next, Up next and Last" width="460"><br>**Normal window.** A narrower window keeps Next, Up next and Last on one line. |
-| <img src="screenshots/add-plan.png" alt="Add plan dialog filling in F1 Las Vegas Grand Prix" width="460"><br>**Add a plan.** Drag across days or press `N`, then name it, pick the type and color, and add a note. | <img src="screenshots/plan-detail.png" alt="A plan opened on the board with its note and photo" width="460"><br>**Open a plan.** Click a plan to see its note and photos right on the board. |
-| <img src="screenshots/plan-edit.png" alt="Edit plan dialog with a note, checklist and photo" width="460"><br>**Notes, checklists and photos.** Up to four images per plan. | |
-
-Barbecue photo: ["Barbecue plate at Black's Barbecue"](https://commons.wikimedia.org/wiki/File:Barbecue_plate_at_Black%27s_Barbecue.jpg) by T.Tseng, [CC BY 2.0](https://creativecommons.org/licenses/by/2.0/), via Wikimedia Commons.
+| <img src="screenshots/hero.png" alt="Full year board of demo plans, with the day header pinned and thin bars wrapping between months" width="460"><br>**Full board.** The year on one screen. Past months fade, Upcoming and Last stay on the strip, and thin bars wrap from one month into the next. | <img src="screenshots/window.png" alt="Planner floating on the desktop, with Next and Up next on one line" width="460"><br>**Floating window.** A narrower window keeps Next, Up next and Last on one line, and search is an icon. |
+| <img src="screenshots/add-plan.png" alt="Quick add popover for F1 Las Vegas GP, with Attach photo and a note" width="460"><br>**Quick add.** Click a day, name the plan, attach a photo, pick Plan or Trip, and add a note. Enter adds it. | <img src="screenshots/plan-photo.png" alt="F1 Las Vegas GP opened on the board with its note and a photo of a Formula One car" width="460"><br>**A plan with a photo.** Click a plan to see its dates, note and photo on the board. |
 
 ## Privacy
 
@@ -55,7 +53,7 @@ Everything stays on your machine.
 omarchy plugin add https://github.com/KarPage/oma-year-planner --enable
 ```
 
-This adds a calendar button to your bar. Left-click opens a small menu: open the planner in its own app window (themed with your current Omarchy colors), pin or unpin the board on the wallpaper, toggle full screen, refresh the pinned picture, or quit. In the menu, `O`, `W`, `F`, `R` and `Q` do the same, and `Esc` closes it. Right-click pins or unpins straight away. A small dot on the button shows while the board is pinned. If the button doesn't show up, add **Oma Year Planner** to the bar from the bar settings.
+This adds a calendar button to your bar. Left-click opens a small menu: open the planner in its own app window (themed with your current Omarchy colors), pin or unpin the board on the wallpaper, toggle full screen, refresh the pinned picture, choose Left, Center, or Right for the bar position, or quit. In the menu, `O`, `W`, `F`, `R`, `1`, `2`, `3` and `Q` do the same, and `Esc` closes it. Right-click pins or unpins straight away. A small dot on the button shows while the board is pinned. If the button doesn't show up, add **Oma Year Planner** to the bar from the bar settings.
 
 You need Chromium (it ships with Omarchy), Python 3 for the theme sync and the pin helper, `curl`, and ImageMagick (`magick`) for wallpaper mode.
 
@@ -104,7 +102,7 @@ A still picture of the board, laid over the desktop. Nothing on it clicks or mov
 
 Right-click the bar button to toggle it. While it is pinned, the picture is painted again at midnight, and again when the planner window closes.
 
-In the planner, the **Pin to desktop** button and the `W` key do the same thing.
+In the planner, the pin icon asks before it pins or unpins. The `W` key does it straight away.
 
 Optional Hyprland shortcut, so you can unpin when the planner is closed. This is a step you add yourself; the plugin does not change your Hyprland config. Add it to `~/.config/hypr/yearplanner.lua` (or wherever you keep binds), with the path to this plugin's `year-planner/wallpaper`. When installed as a plugin, that is `~/.config/omarchy/plugins/io.github.karpage.oma-year/year-planner/wallpaper`:
 
