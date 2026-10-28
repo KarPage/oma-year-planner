@@ -44,7 +44,7 @@ The page and the board set `overflow-x: hidden`, and `.calendar` uses `overflow-
 
 The app is local-first. Plans and notes are stored in `localStorage` under `year-planner/v1`. Images are stored in IndexedDB. Do not add network requests other than the optional read-only Google Calendar. That client is `gcal.js`: scope `calendar.readonly`, the sign-in script loads only after Connect, and the button stays hidden while `GOOGLE_CLIENT_ID` in `config.js` is `""`. The access token stays in memory. Synced state is `year-planner/gcal`, separate from the plan list.
 
-Screenshots and test data must be demo data only. The root README says the plans in `screenshots/` are demo data, and it credits the barbecue photo as a real Wikimedia Commons image (T.Tseng, CC BY 2.0). Do not put real personal plans in screenshots, fixtures, or tests. Do not add AI-generated photos. A new image has to be a real photograph or illustration, under a free license, with credit in the README.
+Screenshots and test data must be demo data only. The root README says the plans in `screenshots/` are demo data. Do not put real personal plans in screenshots, fixtures, or tests. Do not add AI-generated photos. A new image has to be a real photograph or illustration, under a free license, with credit in the README.
 
 ## Repository
 

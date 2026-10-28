@@ -4,14 +4,14 @@ A scrolling year board for plans and trips. It is one HTML page, a stylesheet, a
 
 Your data stays on your device. Plans are saved in this browser under `year-planner/v1`. Images are saved in IndexedDB, not in that plan list. Nothing is sent to a server unless you connect Google Calendar, which is optional and off by default.
 
-Screenshots for a release live in [screenshots/](screenshots/). The wide shot shows the pinned day header, the Upcoming cells, and full-color plans ahead of today. The narrow shot shows Next, Up next, and Last on one line, with the search field collapsed to an icon.
+Screenshots for a release live in [screenshots/](../screenshots/). The hero is the full board, with the pinned day header and thin bars that wrap from one month into the next. The window shot is the planner floating on the desktop, with Next and Up next on one line and search as an icon. Quick add is the popover, including a photo. The plan shot shows a note and a photo.
 
 ## Features
 
 - Months run in one scrolling board. The day numbers stay pinned. A year label sits between December and January. The board starts on the previous year through two years ahead, and keeps 2025 through 2028 while that window still overlaps them. The year arrows stop at either end.
 - Rolling 12 starts at the current month. The year arrows jump to January.
-- Click a day to add a plan. A handle on that day extends the range, and so do Shift+click and Shift+arrow. Drag a bar to move a plan, or drag its own ends to resize it. A small drag is ignored so a click does not move a plan.
-- A plan that runs past the end of a month fades out over about two days and fades back in on the next row. The name stays on the longer piece.
+- Click a day to open quick add. It can attach a photo, a tag, a trip or plan type, and a note. A handle on that day extends the range, and so do Shift+click and Shift+arrow. Drag a bar to move a plan, or drag its own ends to resize it. A small drag is ignored so a click does not move a plan.
+- A thin bar that runs past the end of a month fades out over about two days and fades back in on the next row. The name stays on the longer piece.
 - A plan is a Trip, an Event, or a Reminder. Older plans with no type are treated as a trip when they cover more than one day, and as an event when they cover one day.
 - Days away counts trips only. That number is on the dashboard, at the end of each month, and in the Away popover.
 - One-day plans are chips in the day cell. Two stack in the day. More than that shows a +N chip that lists them. Click one to edit the name, color, or type. A checklist can show progress on a longer bar, such as `Canada · 8d · 3/7`.
