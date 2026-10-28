@@ -4,8 +4,9 @@ import Quickshell
 import qs.Commons
 import qs.Ui
 
-// The bar menu: open, pin, full screen, refresh, quit. Keys O W F R Q work
-// while it is open; arrows or j/k move, Enter runs, Esc closes.
+// The bar menu: open, pin, full screen, refresh, bar position, quit.
+// Keys O W F R Q run actions. 1 2 3 set the bar side. Arrows or j/k move,
+// Enter runs, Esc closes.
 Panel {
   id: panel
   moduleName: "io.github.karpage.oma-year"
@@ -17,7 +18,7 @@ Panel {
   readonly property color dim: Util.alpha(fg, 0.55)
   readonly property color accent: Color.accent
   readonly property string fontFamily: widget.bar ? widget.bar.fontFamily : Style.font.family
-  readonly property int rowHeight: Style.space(30)
+  readonly property int rowHeight: Style.space(40)
   // Quit uses the theme's red. Some themes map "red" to a soft tint of their
   // main colour; then fall back to a plain red so Quit still reads as danger.
   readonly property color danger: {
@@ -137,8 +138,8 @@ Panel {
     focusTarget: keyCatcher
     padding: 0
     borderSpec: Border.flat(panel.accent, 1)
-    contentWidth: kpanel.fittedContentWidth(Style.space(264))
-    contentHeight: kpanel.fittedContentHeight(content.implicitHeight, Style.space(400))
+    contentWidth: kpanel.fittedContentWidth(Style.space(360))
+    contentHeight: kpanel.fittedContentHeight(content.implicitHeight, Style.space(560))
 
     PanelKeyCatcher {
       id: keyCatcher
@@ -149,6 +150,11 @@ Panel {
         if (panel.cursor >= 0 && panel.actions[panel.cursor].enabled) panel.run(panel.actions[panel.cursor].key)
       }
       onTextKey: function(t) {
+        var sideKeys = { "1": "left", "2": "center", "3": "right" }
+        if (sideKeys[t]) {
+          panel.widget.setBarSide(sideKeys[t])
+          return
+        }
         var keys = { "o": "open", "w": "pin", "f": "fullscreen", "r": "refresh", "q": "quit" }
         var key = keys[t.toLowerCase()]
         if (!key) return
@@ -161,12 +167,12 @@ Panel {
         id: content
         anchors.left: parent.left
         anchors.right: parent.right
-        spacing: 0
+        spacing: Style.space(6)
 
         // Header
         Item {
           Layout.fillWidth: true
-          implicitHeight: Style.space(34)
+          implicitHeight: Style.space(44)
           Text {
             id: headGlyph
             x: Style.space(12)
@@ -202,7 +208,6 @@ Panel {
           }
         }
         Rectangle { Layout.fillWidth: true; implicitHeight: 1; color: Util.alpha(panel.accent, 0.35) }
-        Item { Layout.fillWidth: true; implicitHeight: Style.space(4) }
 
         MenuRow { index: 0; glyph: "\uf08e"; label: "Open planner"; hint: "O" }
         MenuRow {
@@ -220,31 +225,78 @@ Panel {
         }
         MenuRow { index: 3; glyph: "\uf021"; label: "Refresh desktop snapshot"; hint: "R" }
 
-        Item { Layout.fillWidth: true; implicitHeight: Style.space(4) }
+        ColumnLayout {
+          Layout.fillWidth: true
+          Layout.leftMargin: Style.space(12)
+          Layout.rightMargin: Style.space(12)
+          Layout.topMargin: Style.space(4)
+          Layout.bottomMargin: Style.space(4)
+          spacing: Style.space(8)
+          Text {
+            text: "Bar position"
+            color: panel.fg
+            font.family: panel.fontFamily
+            font.pixelSize: Style.font.bodySmall + 1
+          }
+          RowLayout {
+            Layout.fillWidth: true
+            spacing: -1
+            Repeater {
+              model: [
+                { "side": "left", "label": "Left", "hint": "1" },
+                { "side": "center", "label": "Center", "hint": "2" },
+                { "side": "right", "label": "Right", "hint": "3" }
+              ]
+              delegate: Rectangle {
+                required property var modelData
+                Layout.fillWidth: true
+                implicitHeight: Style.space(40)
+                radius: 0
+                border.width: 1
+                border.color: panel.widget.barSide === modelData.side ? panel.accent : Util.alpha(panel.fg, 0.45)
+                color: panel.widget.barSide === modelData.side ? panel.accent : "transparent"
+                Text {
+                  anchors.centerIn: parent
+                  text: modelData.label
+                  color: panel.widget.barSide === modelData.side ? "#04140c" : panel.fg
+                  font.family: panel.fontFamily
+                  font.pixelSize: Style.font.bodySmall
+                  font.bold: panel.widget.barSide === modelData.side
+                }
+                MouseArea {
+                  anchors.fill: parent
+                  cursorShape: Qt.PointingHandCursor
+                  onClicked: panel.widget.setBarSide(modelData.side)
+                }
+              }
+            }
+          }
+        }
+
         Rectangle { Layout.fillWidth: true; implicitHeight: 1; color: Util.alpha(panel.fg, 0.12) }
 
         // Quit: a quiet outlined danger button. Faint red tint at rest,
         // stronger tint and a full red border on hover or press.
         Item {
           Layout.fillWidth: true
-          implicitHeight: panel.rowHeight + Style.space(14)
+          implicitHeight: panel.rowHeight + Style.space(28)
           Rectangle {
             id: quitButton
             readonly property bool usable: panel.actions[4].enabled
             readonly property bool hot: usable && (quitMouse.containsMouse || panel.cursor === 4)
             readonly property bool down: usable && quitMouse.pressed
-            readonly property color ink: Qt.tint(panel.fg, Util.alpha(panel.danger, 0.4))
+            readonly property color ink: panel.danger
             anchors.fill: parent
-            anchors.leftMargin: Style.space(6)
-            anchors.rightMargin: Style.space(6)
-            anchors.topMargin: Style.space(7)
-            anchors.bottomMargin: Style.space(7)
+            anchors.leftMargin: Style.space(12)
+            anchors.rightMargin: Style.space(12)
+            anchors.topMargin: Style.space(10)
+            anchors.bottomMargin: Style.space(10)
             radius: 0
             color: !usable ? "transparent"
-                 : Util.alpha(panel.danger, down ? 0.32 : (hot ? 0.22 : 0.10))
+                 : Util.alpha(panel.danger, down ? 0.28 : (hot ? 0.18 : 0.08))
             border.width: 1
             border.color: !usable ? Util.alpha(panel.fg, 0.15)
-                        : (hot ? panel.danger : Util.alpha(panel.danger, 0.55))
+                        : (hot ? panel.danger : Util.alpha(panel.danger, 0.65))
             Text {
               id: quitGlyph
               x: Style.space(6)
@@ -289,7 +341,8 @@ Panel {
 
         Text {
           Layout.fillWidth: true
-          Layout.bottomMargin: Style.space(8)
+          Layout.topMargin: Style.space(4)
+          Layout.bottomMargin: Style.space(14)
           horizontalAlignment: Text.AlignHCenter
           text: "RIGHT-CLICK ICON · QUICK PIN"
           color: Util.alpha(panel.fg, 0.4)

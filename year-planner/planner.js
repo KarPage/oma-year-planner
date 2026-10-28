@@ -171,11 +171,42 @@ var Planner = (function () {
     return parts.join(", ") + ".";
   }
 
+  /* Previous year through two years ahead. While that window still touches
+     2025–2028, keep those years on the board so the range rolls forward
+     without dropping the years this release promised. */
+  var BROWSE_ANCHOR_START = 2025;
+  var BROWSE_ANCHOR_END = 2028;
+  var DRAG_THRESHOLD = 6;
+
+  function browseSpan(year) {
+    var y = year | 0;
+    if (!y) y = new Date().getFullYear();
+    var rollStart = y - 1;
+    var rollEnd = y + 2;
+    var start = rollStart;
+    var end = rollEnd;
+    var touches = rollEnd >= BROWSE_ANCHOR_START && rollStart <= BROWSE_ANCHOR_END;
+    var before = rollEnd < BROWSE_ANCHOR_START;
+    if (touches || before) {
+      start = Math.min(rollStart, BROWSE_ANCHOR_START);
+      end = Math.max(rollEnd, BROWSE_ANCHOR_END);
+    }
+    return { start: start, end: end };
+  }
+
+  function yearNavEnds(viewYear, rangeStart, rangeEnd) {
+    return {
+      prev: !(viewYear > rangeStart),
+      next: !(viewYear < rangeEnd)
+    };
+  }
+
   function rollingRange(today, plans) {
     var y = today && typeof today === "object" ? today.y : (parse(today) || {}).y;
     if (!y) y = new Date().getFullYear();
-    var start = y;
-    var end = y + 1;
+    var span = browseSpan(y);
+    var start = span.start;
+    var end = span.end;
     /* At most two years before the current year and three years after it.
        A typo year must not stretch the board. */
     var minY = y - 2;
@@ -302,30 +333,232 @@ var Planner = (function () {
     return 3 + shown * 7 + (shown - 1) * 2 + 3;
   }
 
+  function edgeInsets(margin) {
+    if (margin && typeof margin === "object") {
+      return {
+        top: margin.top == null ? 8 : margin.top,
+        right: margin.right == null ? 8 : margin.right,
+        bottom: margin.bottom == null ? 8 : margin.bottom,
+        left: margin.left == null ? 8 : margin.left
+      };
+    }
+    var edge = margin == null ? 8 : margin;
+    return { top: edge, right: edge, bottom: edge, left: edge };
+  }
+
   /* Keep a popover fully inside the viewport. Prefer below the anchor,
-     flip above when that would clip, then shift left or right. */
+     flip above when that would clip, then shift left or right.
+     margin may be a number or { top, right, bottom, left }. arrow is the
+     anchor center measured from the popover's left edge. */
   function placeNear(anchor, size, view, gap, margin) {
     var g = gap == null ? 6 : gap;
-    var edge = margin == null ? 8 : margin;
+    var edge = edgeInsets(margin);
     var width = size.width;
     var height = size.height;
     var left = anchor.left;
     var top = anchor.bottom + g;
     var flipped = false;
-    if (top + height > view.height - edge) {
+    if (top + height > view.height - edge.bottom) {
       var above = anchor.top - height - g;
-      if (above >= edge) {
+      if (above >= edge.top) {
         top = above;
         flipped = true;
       } else {
-        top = view.height - edge - height;
+        top = view.height - edge.bottom - height;
       }
     }
-    if (top < edge) top = edge;
-    if (top + height > view.height - edge) top = Math.max(edge, view.height - edge - height);
-    if (left + width > view.width - edge) left = view.width - edge - width;
-    if (left < edge) left = edge;
-    return { left: left, top: top, flipped: flipped };
+    if (top < edge.top) top = edge.top;
+    if (top + height > view.height - edge.bottom) top = Math.max(edge.top, view.height - edge.bottom - height);
+    if (left + width > view.width - edge.right) left = view.width - edge.right - width;
+    if (left < edge.left) left = edge.left;
+    var mid = anchor.left;
+    if (anchor.right != null) mid = (anchor.left + anchor.right) / 2;
+    else if (anchor.width != null) mid = anchor.left + anchor.width / 2;
+    return { left: left, top: top, flipped: flipped, arrow: mid - left };
+  }
+
+  /* A drag starts only after the pointer has moved at least `threshold` px. */
+  function dragPastThreshold(dx, dy, threshold) {
+    var limit = threshold == null ? DRAG_THRESHOLD : threshold;
+    if (!(limit >= 0)) limit = DRAG_THRESHOLD;
+    return (dx * dx + dy * dy) >= (limit * limit);
+  }
+
+  /* Click never moves a plan. Resize only from its own end handles. */
+  function planGesture(where, pastThreshold) {
+    if (!pastThreshold) return "none";
+    if (where === "start" || where === "end") return "resize";
+    if (where === "body") return "move";
+    return "none";
+  }
+
+  /* A body drag commits only after the pointer travels a full day cell,
+     across or down into the next row. A small slip stays a click. */
+  function moveCommit(dx, dy, cellWidth, cellHeight) {
+    if (!dragPastThreshold(dx, dy)) return false;
+    var across = cellWidth > 0 ? cellWidth : 32;
+    var down = cellHeight > 0 ? cellHeight : 48;
+    return Math.abs(dx) >= across || Math.abs(dy) >= down;
+  }
+
+  /* One or two single-day plans show as chips. A third becomes one chip
+     plus a +N counter, so a day never stacks more than two rows. */
+  function dayChipStack(count) {
+    var n = count | 0;
+    if (n <= 0) return { visible: 0, more: 0, rows: 0 };
+    if (n === 1) return { visible: 1, more: 0, rows: 1 };
+    if (n === 2) return { visible: 2, more: 0, rows: 2 };
+    return { visible: 1, more: n - 1, rows: 2 };
+  }
+
+  var CHIP_LABEL_MIN = 36;
+
+  function chipUsesInitial(cellWidth) {
+    return !(cellWidth >= CHIP_LABEL_MIN);
+  }
+
+  function chipInitial(title) {
+    var text = String(title || "").trim();
+    if (!text) return "";
+    return text.charAt(0).toUpperCase();
+  }
+
+  /* The header pin button asks first. Skip stores a local choice.
+     Already pinned asks to unpin, unless that choice says to act directly. */
+  function pinButtonAction(skipped, pinned) {
+    if (skipped) return pinned ? "unpin" : "pin";
+    return pinned ? "ask-unpin" : "ask-pin";
+  }
+
+  /* The clicked day stays the anchor. The other end follows the pointer. */
+  function selectionSpan(anchor, end) {
+    if (!anchor || !parse(anchor)) return null;
+    if (!end || !parse(end)) end = anchor;
+    if (anchor <= end) return { start: anchor, end: end, anchor: anchor, edge: "end" };
+    return { start: end, end: anchor, anchor: anchor, edge: "start" };
+  }
+
+  function extendSelection(selection, iso) {
+    if (!iso || !parse(iso)) return selection || null;
+    var anchor = selection && (selection.anchor || selection.start);
+    if (!anchor || !parse(anchor)) return selectionSpan(iso, iso);
+    return selectionSpan(anchor, iso);
+  }
+
+  function nudgeSelection(selection, deltaDays) {
+    if (!selection || !selection.start) return selection || null;
+    var anchor = selection.anchor || selection.start;
+    var moving = selection.edge === "start" ? selection.start : selection.end;
+    var next = addDays(moving, deltaDays | 0);
+    if (!next) return selection;
+    return selectionSpan(anchor, next);
+  }
+
+  /* Same away cell toggles closed. A different cell switches. */
+  function awayToggle(openKey, key) {
+    if (!key) return "";
+    return openKey === key ? "" : String(key);
+  }
+
+  /* A wrapping plan is one bar per month. Fade about two day cells at each
+     cut. The name stays on the longest piece, and also on a piece at least
+     two thirds as long, but never inside the fade. */
+  function wrapLabels(segments) {
+    var list = Array.isArray(segments) ? segments : [];
+    var max = 0;
+    var i;
+    for (i = 0; i < list.length; i++) {
+      var span = list[i] && list[i].span | 0;
+      if (span > max) max = span;
+    }
+    var out = [];
+    for (i = 0; i < list.length; i++) {
+      var seg = list[i] || {};
+      var n = seg.span | 0;
+      if (n < 1) {
+        out.push({ show: false, fade: 0, lead: 0, tail: 0 });
+        continue;
+      }
+      var fade = n < 2 ? n : 2;
+      var lead = seg.continuesBefore ? fade : 0;
+      var tail = seg.continuesAfter ? fade : 0;
+      if (lead + tail > n) {
+        lead = seg.continuesBefore ? Math.ceil(n / 2) : 0;
+        tail = n - lead;
+      }
+      var room = n - lead - tail;
+      var similar = max > 0 && n * 3 >= max * 2;
+      out.push({
+        show: !!(similar && room >= 1),
+        fade: fade,
+        lead: lead,
+        tail: tail
+      });
+    }
+    return out;
+  }
+
+  /* Widest free run of days inside a bar. Ties go to the run nearest the
+     center, then the earlier run. `from` is 1-based within the bar. */
+  function labelSlot(startDay, endDay, blockedDays) {
+    var start = startDay | 0;
+    var end = endDay | 0;
+    var span = end - start + 1;
+    if (span < 1) return { from: 1, to: 1, span: 1 };
+    var blocked = Object.create(null);
+    (blockedDays || []).forEach(function (day) {
+      var n = day | 0;
+      if (n >= start && n <= end) blocked[n] = true;
+    });
+    var best = null;
+    var runFrom = null;
+    function consider(from, to) {
+      if (from == null || to < from) return;
+      var len = to - from + 1;
+      var center = (start + end) / 2;
+      var dist = Math.abs((from + to) / 2 - center);
+      var better = !best || len > best.len
+        || (len === best.len && dist < best.dist - 1e-9)
+        || (len === best.len && Math.abs(dist - best.dist) < 1e-9 && from < best.from);
+      if (better) best = { from: from, to: to, len: len, dist: dist };
+    }
+    for (var day = start; day <= end; day++) {
+      if (blocked[day]) {
+        consider(runFrom, day - 1);
+        runFrom = null;
+      } else if (runFrom == null) {
+        runFrom = day;
+      }
+    }
+    consider(runFrom, end);
+    if (!best) return { from: 1, to: span, span: span };
+    return { from: best.from - start + 1, to: best.to - start + 1, span: best.len };
+  }
+
+  function planSpanPhrase(start, end) {
+    function one(iso) {
+      var p = parse(iso);
+      if (!p) return String(iso || "");
+      return LETTERS[weekday(p.y, p.m, p.d)] + " " + MONTHS[p.m - 1] + " " + p.d;
+    }
+    if (!start) return "";
+    var a = end && end < start ? end : start;
+    var b = end && end < start ? start : (end || start);
+    if (a === b) return one(a);
+    return one(a) + " – " + one(b);
+  }
+
+  function planLengthPhrase(start, end) {
+    return plural(inclusiveDays(start, end), "day");
+  }
+
+  function planTimingPhrase(start, end, today) {
+    if (!start || !end || !today || !parse(start) || !parse(end) || !parse(today)) return "";
+    var a = start <= end ? start : end;
+    var b = start <= end ? end : start;
+    if (today < a) return plural(diffDays(today, a), "day") + " until it starts";
+    if (today > b) return "ended " + plural(diffDays(b, today), "day") + " ago";
+    return "in progress, " + plural(diffDays(today, b) + 1, "day") + " left";
   }
 
   function daysInMonth(y, m) {
@@ -1058,11 +1291,11 @@ var Planner = (function () {
       errors.push("range label one " + rangeCountLabel("2026-06-01", "2026-06-01"));
     }
     var rollingEmpty = rollingRange({ y: 2026, m: 10, d: 25 }, []);
-    if (rollingEmpty.start !== 2026 || rollingEmpty.end !== 2027) errors.push("rolling empty");
+    if (rollingEmpty.start !== 2025 || rollingEmpty.end !== 2028) errors.push("rolling empty");
     var rollingInside = rollingRange({ y: 2026, m: 6, d: 1 }, [
       { start: "2026-01-05", end: "2026-01-11" }
     ]);
-    if (rollingInside.start !== 2026 || rollingInside.end !== 2027) errors.push("rolling inside");
+    if (rollingInside.start !== 2025 || rollingInside.end !== 2028) errors.push("rolling inside");
     var rollingWide = rollingRange({ y: 2026, m: 1, d: 1 }, [
       { start: "2025-12-30", end: "2026-01-02" },
       { start: "2028-05-01", end: "2028-05-04" },
@@ -1086,7 +1319,102 @@ var Planner = (function () {
     var rollingTypo = rollingRange({ y: 2026, m: 1, d: 1 }, [
       { start: "2099-01-01", end: "2099-01-08" }
     ]);
-    if (rollingTypo.start !== 2026 || rollingTypo.end !== 2027) errors.push("rolling typo");
+    if (rollingTypo.start !== 2025 || rollingTypo.end !== 2028) errors.push("rolling typo");
+    var browseNow = browseSpan(2026);
+    if (browseNow.start !== 2025 || browseNow.end !== 2028) errors.push("browse now");
+    var browseNext = browseSpan(2027);
+    if (browseNext.start !== 2025 || browseNext.end !== 2029) errors.push("browse 2027");
+    var browseLater = browseSpan(2030);
+    if (browseLater.start !== 2029 || browseLater.end !== 2032) errors.push("browse later");
+    var browseEarly = browseSpan(2020);
+    if (browseEarly.start !== 2019 || browseEarly.end !== 2028) errors.push("browse early");
+    var boardMonths = monthsInRange(2025, 2028);
+    if (boardMonths.length !== 48) errors.push("board months");
+    if (!boardMonths[24] || boardMonths[24].y !== 2027 || boardMonths[24].m !== 1) errors.push("2027 divider month");
+    var navStart = yearNavEnds(2025, 2025, 2028);
+    var navMid = yearNavEnds(2026, 2025, 2028);
+    var navEnd = yearNavEnds(2028, 2025, 2028);
+    if (!navStart.prev || navStart.next || navMid.prev || navMid.next || navEnd.prev || !navEnd.next) {
+      errors.push("year nav ends");
+    }
+    var slotWide = labelSlot(1, 10, [2, 3]);
+    if (slotWide.from !== 4 || slotWide.span !== 7) errors.push("label slot wide " + slotWide.from);
+    var slotNear = labelSlot(1, 10, [5]);
+    if (slotNear.from !== 6 || slotNear.span !== 5) errors.push("label slot near");
+    var slotEarly = labelSlot(1, 6, [3, 4]);
+    if (slotEarly.from !== 1 || slotEarly.span !== 2) errors.push("label slot tie");
+    var slotFull = labelSlot(4, 8, [4, 5, 6, 7, 8]);
+    if (slotFull.from !== 1 || slotFull.span !== 5) errors.push("label slot blocked");
+    var familyWrap = wrapLabels([
+      { span: 24, continuesAfter: true },
+      { span: 2, continuesBefore: true }
+    ]);
+    if (!familyWrap[0].show || familyWrap[0].lead !== 0 || familyWrap[0].tail !== 2) errors.push("wrap long");
+    if (familyWrap[1].show || familyWrap[1].lead !== 2) errors.push("wrap stub");
+    var similarWrap = wrapLabels([
+      { span: 12, continuesAfter: true },
+      { span: 10, continuesBefore: true }
+    ]);
+    if (!similarWrap[0].show || !similarWrap[1].show) errors.push("wrap similar");
+    if (similarWrap[0].tail !== 2 || similarWrap[1].lead !== 2) errors.push("wrap similar fade");
+    var shortWrap = wrapLabels([
+      { span: 1, continuesAfter: true },
+      { span: 1, continuesBefore: true }
+    ]);
+    if (shortWrap[0].show || shortWrap[1].show) errors.push("wrap short");
+    var middleWrap = wrapLabels([
+      { span: 3, continuesAfter: true },
+      { span: 31, continuesBefore: true, continuesAfter: true },
+      { span: 4, continuesBefore: true }
+    ]);
+    if (middleWrap[0].show || !middleWrap[1].show || middleWrap[1].lead !== 2 || middleWrap[1].tail !== 2 || middleWrap[2].show) {
+      errors.push("wrap middle");
+    }
+    var plainWrap = wrapLabels([{ span: 5 }]);
+    if (!plainWrap[0].show || plainWrap[0].lead || plainWrap[0].tail) errors.push("wrap plain");
+    if (planSpanPhrase("2026-11-07", "2026-12-02") !== "Sat Nov 7 – Wed Dec 2") errors.push("span phrase");
+    if (planSpanPhrase("2026-10-26", "2026-10-26") !== "Mon Oct 26") errors.push("span one");
+    if (planLengthPhrase("2026-11-07", "2026-12-02") !== "26 days") errors.push("length phrase");
+    if (planTimingPhrase("2026-11-07", "2026-12-02", "2026-10-26") !== "12 days until it starts") errors.push("timing before");
+    if (planTimingPhrase("2026-11-07", "2026-12-02", "2026-11-07") !== "in progress, 26 days left") errors.push("timing start");
+    if (planTimingPhrase("2026-11-07", "2026-12-02", "2026-12-02") !== "in progress, 1 day left") errors.push("timing end");
+    if (planTimingPhrase("2026-11-07", "2026-12-02", "2026-12-03") !== "ended 1 day ago") errors.push("timing after");
+    if (dragPastThreshold(5, 0) || dragPastThreshold(0, 5.9)) errors.push("drag under");
+    if (!dragPastThreshold(6, 0) || !dragPastThreshold(5, 4)) errors.push("drag over");
+    if (planGesture("body", false) !== "none" || planGesture("end", false) !== "none") errors.push("gesture click");
+    if (planGesture("body", true) !== "move") errors.push("gesture move");
+    if (planGesture("start", true) !== "resize" || planGesture("end", true) !== "resize") errors.push("gesture resize");
+    if (planGesture("away", true) !== "none") errors.push("gesture other");
+    if (moveCommit(10, 0, 40, 56) || moveCommit(5, 0, 40, 56) || moveCommit(39, 49, 40, 56)) errors.push("move short");
+    if (!moveCommit(40, 0, 40, 56) || !moveCommit(0, 56, 40, 56)) errors.push("move cell");
+    var oneChip = dayChipStack(1);
+    var twoChip = dayChipStack(2);
+    var fourChip = dayChipStack(4);
+    var noneChip = dayChipStack(0);
+    if (oneChip.visible !== 1 || oneChip.more !== 0 || oneChip.rows !== 1) errors.push("chip one");
+    if (twoChip.visible !== 2 || twoChip.more !== 0 || twoChip.rows !== 2) errors.push("chip two");
+    if (fourChip.visible !== 1 || fourChip.more !== 3 || fourChip.rows !== 2) errors.push("chip more");
+    if (noneChip.visible !== 0 || noneChip.rows !== 0) errors.push("chip none");
+    if (!chipUsesInitial(35) || chipUsesInitial(36) || chipUsesInitial(80)) errors.push("chip narrow");
+    if (chipInitial("soccer") !== "S" || chipInitial("  tx ") !== "T" || chipInitial("") !== "") errors.push("chip initial");
+    if (pinButtonAction(false, false) !== "ask-pin" || pinButtonAction(false, true) !== "ask-unpin") errors.push("pin ask");
+    if (pinButtonAction(true, false) !== "pin" || pinButtonAction(true, true) !== "unpin") errors.push("pin skip");
+    var oneDay = selectionSpan("2026-10-26", "2026-10-26");
+    if (!oneDay || oneDay.start !== "2026-10-26" || oneDay.end !== "2026-10-26" || oneDay.edge !== "end") errors.push("select one");
+    var grown = extendSelection(oneDay, "2026-11-02");
+    if (!grown || grown.start !== "2026-10-26" || grown.end !== "2026-11-02" || grown.anchor !== "2026-10-26" || grown.edge !== "end") {
+      errors.push("select extend");
+    }
+    var shrunk = extendSelection(grown, "2026-10-20");
+    if (!shrunk || shrunk.start !== "2026-10-20" || shrunk.end !== "2026-10-26" || shrunk.edge !== "start") errors.push("select flip");
+    var nudged = nudgeSelection(oneDay, 1);
+    if (!nudged || nudged.end !== "2026-10-27" || nudged.anchor !== "2026-10-26") errors.push("select nudge");
+    var nudgedBack = nudgeSelection(oneDay, -1);
+    if (!nudgedBack || nudgedBack.start !== "2026-10-25" || nudgedBack.edge !== "start") errors.push("select nudge back");
+    if (awayToggle("", "2026-06") !== "2026-06") errors.push("away open");
+    if (awayToggle("2026-06", "2026-06") !== "") errors.push("away close");
+    if (awayToggle("2026-06", "2026-07") !== "2026-07") errors.push("away switch");
+    if (awayToggle("2026-06", "") !== "") errors.push("away clear");
     var outside = plansOutsideRange([
       { id: "old", title: "Old", start: "2001-01-01", end: "2001-01-02" },
       { id: "edge", title: "Edge", start: "2023-12-30", end: "2024-01-02" },
@@ -1204,6 +1532,15 @@ var Planner = (function () {
     );
     if (clamped.left !== 8 || clamped.top !== 8) errors.push("place clamp");
     if (clamped.top + 700 > 300 - 8 && clamped.top !== 8) errors.push("place clamp top");
+    var inset = placeNear(
+      { left: 40, top: 10, right: 80, bottom: 30 },
+      { width: 100, height: 40 },
+      { width: 800, height: 600 },
+      6,
+      { top: 48, right: 8, bottom: 8, left: 8 }
+    );
+    if (inset.top !== 48 || inset.flipped || inset.left !== 40) errors.push("place inset " + inset.top);
+    if (Math.abs(inset.arrow - 20) > 0.01) errors.push("place arrow " + inset.arrow);
     var away = monthAwayDetail([
       { id: "nish", title: "Nish Canada", color: "#74a869", start: "2026-11-17", end: "2026-11-24" },
       { id: "game", title: "soccer game", color: "#37a388", start: "2026-11-03", end: "2026-11-03" },
@@ -1395,7 +1732,9 @@ var Planner = (function () {
     barInk: barInk,
     importStatus: importStatus,
     rangeCountLabel: rangeCountLabel,
+    browseSpan: browseSpan,
     rollingRange: rollingRange,
+    yearNavEnds: yearNavEnds,
     plansOutsideRange: plansOutsideRange,
     mergePlans: mergePlans,
     isSingleDay: isSingleDay,
@@ -1409,6 +1748,22 @@ var Planner = (function () {
     backupTooLarge: backupTooLarge,
     singleMarkerReserve: singleMarkerReserve,
     placeNear: placeNear,
+    dragPastThreshold: dragPastThreshold,
+    planGesture: planGesture,
+    moveCommit: moveCommit,
+    dayChipStack: dayChipStack,
+    chipUsesInitial: chipUsesInitial,
+    chipInitial: chipInitial,
+    pinButtonAction: pinButtonAction,
+    selectionSpan: selectionSpan,
+    extendSelection: extendSelection,
+    nudgeSelection: nudgeSelection,
+    awayToggle: awayToggle,
+    labelSlot: labelSlot,
+    wrapLabels: wrapLabels,
+    planSpanPhrase: planSpanPhrase,
+    planLengthPhrase: planLengthPhrase,
+    planTimingPhrase: planTimingPhrase,
     daysInMonth: daysInMonth,
     weekday: weekday,
     weekdayLetter: weekdayLetter,

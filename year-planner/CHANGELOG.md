@@ -1,5 +1,22 @@
 # Changelog
 
+## Unreleased
+
+- Plan names sit in the widest free stretch of the bar, clear of single-day chips. Short bars still end in an ellipsis, and the day count drops before the name does.
+- Selecting a plan highlights the bar itself. The note shows the name, the date range, how many days it covers, whether it is coming up, in progress, or over, and the type. The note is shown only when the plan has one. Edit and delete stay on the card, and double-click still opens the editor.
+- The full-screen button follows the real window state. The bar menu, the F key, F11, and the header button all leave full screen, and the button label matches.
+- In the wide Next block, the day count stays next to the plan name.
+- The bar menu has a Bar position row: Left, Center, or Right, on its own line under the label. The menu is wider, with taller rows and more space around the items, the separators, and Quit. It moves this plugin in the Omarchy shell layout and, when the module is already listed, in Waybar's `modules-left`, `modules-center`, or `modules-right`. The config is backed up first, other entries are left alone, and the bar is reloaded. Keys 1, 2, and 3 select a side.
+- Pin to desktop is an icon in the utility cluster on the right, after full screen and before Add plan, drawn on the same grid as the other utility icons. The year arrows, Today, and Rolling 12 stay centered. The header button asks before it pins or unpins. The bar menu and the W key still act immediately. A saved "Don't show this again" choice skips the question.
+- The board opens on the previous year through two years ahead, and keeps 2025–2028 on screen while that window still overlaps them. The year arrows stop at the ends.
+- Clicking an empty day opens a small add popover on that cell, with the name focused. It can attach a photo (stored in this browser), a tag and color, a trip or plan type, and a note. Enter adds it, Esc or a click outside closes it, and the popover flips so it stays on screen and clear of the bar.
+- A handle on the selection extends or shrinks the range. Shift+click and Shift+arrow do the same. Dragging a plan waits until the pointer has moved, and a move is kept only after the pointer travels a full day. Only the plan's own end handles resize it. Undo move sits next to the status line right after a move.
+- A single-day plan is a chip in its day, under the weekday letter and above the multi-day bars. Two fit in the day. A third becomes a +N chip that lists every plan that day. A narrow cell shows the initial. The name on a longer bar stays clear of those days.
+- The Away count toggles. The same month closes the summary, another month switches to it, and Esc or a click outside closes it. The open cell stays highlighted.
+- A plan that crosses a month fades out over about two days at the end of the row, and fades in the same way on the next row. The ‹ › stay small on that fade. Hovering or selecting either piece highlights both. The name stays on the longer piece, or on both when they are close in length, and it stays out of the fade.
+- Multi-day bars are one thin strip, the same height and the same distance from the bottom of the row, in every month. A row with single-day chips no longer shrinks the bar.
+- Plans that have already ended, including single-day chips, use the theme's muted colors. Hover or selection brings the plan color back. In-progress and upcoming plans stay in their own colors.
+
 ## 1.1.8
 
 ### Security

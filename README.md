@@ -12,18 +12,18 @@
 
 - **Whole year at a glance.** Months run down one scrolling board. The day header stays pinned while the months scroll. "Rolling 12" starts at the current month, and **Today** brings the current month back to the middle.
 - **Past fades back.** Past months and finished plans dim, so what is ahead stands out.
-- **Fast planning.** Drag across days to add a plan, drag a bar to move it, or drag its ends to resize it.
+- **Fast planning.** Click a day to add a plan. Drag the handle to extend the range. Drag a bar to move a plan, or drag its ends to resize it.
 - **Trips, events and reminders.** One-day plans show as small markers. Trips add up to a "days away" count per month and for the year.
 - **Dashboard strip.** Counts for plans, trips and days away, then Next, Up next and Last. A wide window shows three Upcoming plans. A narrow window keeps Next, Up next and Last on one line.
 - **Time and place.** A plan can be all day or have a start and end time, plus an optional place. The place opens in Maps only when you click it. Times and places go along with calendar files and Google Calendar.
 - **Notes, links, checklists and up to four images per plan.** Checklist progress shows on the bar, for example `Canada · 8d · 3/7`.
-- **Full screen.** The button just left of **+ Add plan**, or the `F` key, toggles full screen. Full screen uses the wide dashboard.
+- **Full screen.** The full-screen icon in the utility cluster, or the `F` key, toggles full screen. It also leaves full screen when the window was opened that way from the bar menu. Full screen uses the wide dashboard.
 - **Search** with `/`, **undo** with `Ctrl+Z`, and full keyboard navigation (press `?`).
 - **Backup and calendar files.** Export and import JSON backups, with or without images, and `.ics` calendar files.
 - **Matches your Omarchy theme.** The planner reads the colors from your active theme each time it opens.
-- **Bar menu.** Left-click the bar button for a small menu: **Open planner**, **Pin to desktop** (or **Unpin**), **Full screen**, **Refresh desktop snapshot**, and a red **Quit Year Planner** button. Right-click (or middle-click) pins or unpins straight away. A small dot on the button shows while it is pinned.
+- **Bar menu.** Left-click the bar button for a small menu: **Open planner**, **Pin to desktop** (or **Unpin**), **Full screen**, **Refresh desktop snapshot**, **Bar position** (Left, Center, or Right), and a red **Quit Year Planner** button. Right-click (or middle-click) pins or unpins straight away. A small dot on the button shows while it is pinned. Bar position moves this plugin in the Omarchy shell and, if the module is already there, in Waybar. The config is backed up first.
 - **Quit.** **Quit Year Planner** closes the planner windows and stops the pin helper. It never closes other browser windows, and it leaves a pinned picture and its midnight repaint alone.
-- **Pin to desktop.** A still picture of your year, laid over your wallpaper and painted again at midnight. Pin or unpin it with the **Pin to desktop** button in the header, the `W` key, a right-click on the bar button, or an optional `Super+Shift+Y` shortcut. Nothing on the picture clicks or moves.
+- **Pin to desktop.** A still picture of your year, laid over your wallpaper and painted again at midnight. The pin icon at the right of the header (after full screen, before **+ Add plan**) asks first. The `W` key, the bar menu, and a right-click on the bar button pin or unpin straight away, and so does an optional `Super+Shift+Y` shortcut. Nothing on the picture clicks or moves.
 - **Google Calendar, if you want it.** Optional and read-only. It is off by default. You bring your own Google OAuth client id and run `./serve`. See [year-planner/README.md](year-planner/README.md#google-calendar).
 
 ## Screenshots
@@ -47,7 +47,7 @@ Everything stays on your machine.
 - The page makes no network requests unless you connect Google Calendar. Then events come straight from Google to your browser, read-only. Nothing is sent back.
 - Data leaves your device only when you export a file yourself.
 - Wallpaper mode copies Chromium's local storage into a temporary folder so the picture can show your plans. It takes the picture there and deletes the copy.
-- `./open` starts a small helper so the **Pin to desktop** button can work from a local file. It listens only on `127.0.0.1:47321` and accepts only pin, unpin, toggle and status. It only answers requests that carry a secret token, which lives in a private file under `$XDG_RUNTIME_DIR` and reaches the planner page through a private launcher page, never through a command line. Other pages, including other local files, get 403. It keeps running until you log out.
+- `./open` starts a small helper so the pin button can work from a local file. It listens only on `127.0.0.1:47321` and accepts only pin, unpin, toggle, fullscreen, and status. It only answers requests that carry a secret token, which lives in a private file under `$XDG_RUNTIME_DIR` and reaches the planner page through a private launcher page, never through a command line. Other pages, including other local files, get 403. It keeps running until you log out.
 
 ## Install as an Omarchy plugin
 

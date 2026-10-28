@@ -8,12 +8,13 @@ Screenshots for a release live in [screenshots/](screenshots/). The wide shot sh
 
 ## Features
 
-- Months run in one scrolling board. The day numbers stay pinned. A year label sits between December and January.
+- Months run in one scrolling board. The day numbers stay pinned. A year label sits between December and January. The board starts on the previous year through two years ahead, and keeps 2025 through 2028 while that window still overlaps them. The year arrows stop at either end.
 - Rolling 12 starts at the current month. The year arrows jump to January.
-- Drag across days to add a plan, or click a day twice. Drag a bar to move it, or drag its ends to resize it.
+- Click a day to add a plan. A handle on that day extends the range, and so do Shift+click and Shift+arrow. Drag a bar to move a plan, or drag its own ends to resize it. A small drag is ignored so a click does not move a plan.
+- A plan that runs past the end of a month fades out over about two days and fades back in on the next row. The name stays on the longer piece.
 - A plan is a Trip, an Event, or a Reminder. Older plans with no type are treated as a trip when they cover more than one day, and as an event when they cover one day.
 - Days away counts trips only. That number is on the dashboard, at the end of each month, and in the Away popover.
-- One-day plans are small markers. Click one to edit the name, color, or type. A checklist can show progress on the bar, such as `Canada · 8d · 3/7`.
+- One-day plans are chips in the day cell. Two stack in the day. More than that shows a +N chip that lists them. Click one to edit the name, color, or type. A checklist can show progress on a longer bar, such as `Canada · 8d · 3/7`.
 - Notes can contain links. Up to four images can be attached. They are shrunk before they are stored.
 - Search, undo, and a dashboard strip. A wide window shows the next three plans. A narrow window keeps Next and Up next on one line.
 - JSON backup, with or without images, and `.ics` import and export. A file over 20 MB is refused. Import can replace the list or merge into it.
@@ -48,9 +49,16 @@ A still picture of the board, laid over the desktop. Nothing on it clicks or mov
 ./wallpaper status    say whether it is pinned
 ```
 
-In the planner, **Pin to desktop** does the same thing. Press `W`, or `Super+Shift+Y` from anywhere.
+In the planner, the pin icon asks first, then does the same thing. Press `W`, or use the bar menu, to pin or unpin without the question. `Super+Shift+Y` does it from anywhere once that shortcut is installed.
 
-Left-click the bar icon for a small menu: open the planner, pin or unpin, full screen, refresh the pinned picture, or quit. Right-click pins or unpins straight away.
+Left-click the bar icon for a small menu: open the planner, pin or unpin, full screen, refresh the pinned picture, choose **Bar position**, or quit. Right-click pins or unpins straight away.
+
+**Bar position** is Left, Center, or Right (keys `1`, `2`, and `3`). It moves this plugin in `~/.config/omarchy/shell.json` and, if the module is already listed, in Waybar's `modules-left`, `modules-center`, or `modules-right`. Each file is copied to `path.bak` before it is changed. Other modules are left as they are. A missing or unreadable config is left alone and the menu reports that. The bar is reloaded afterwards. Set `OMA_YEAR_BAR_RELOAD=0` to skip the reload, which the tests do.
+
+```
+./bar-position status
+./bar-position left|center|right
+```
 
 ```
 ./app status       how many planner windows are open, and whether the helper runs
