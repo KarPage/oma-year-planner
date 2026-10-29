@@ -14,6 +14,7 @@ Screenshots for a release live in [screenshots/](../screenshots/). The hero is t
 - A thin bar that runs past the end of a month fades out over about two days and fades back in on the next row. The name stays on the longer piece.
 - A plan is a Trip, an Event, or a Reminder. Older plans with no type are treated as a trip when they cover more than one day, and as an event when they cover one day.
 - Days away counts trips only. That number is on the dashboard, at the end of each month, and in the Away popover.
+- US holidays are a small tick on the day. Hover shows the name. The eleven federal holidays follow the weekday rules, and a fixed date on a weekend also marks the observed Friday or Monday. Valentine's Day, Easter, Mother's Day, Father's Day, Halloween, and New Year's Eve are included. They are not plans and they are not days away. The calendar button in the header hides them. That choice is saved in `year-planner/v1` and starts on.
 - One-day plans are chips in the day cell. Two stack in the day. More than that shows a +N chip that lists them. Click one to edit the name, color, or type. A checklist can show progress on a longer bar, such as `Canada · 8d · 3/7`.
 - Notes can contain links. Up to four images can be attached. They are shrunk before they are stored.
 - Search, undo, and a dashboard strip. A wide window shows the next three plans. A narrow window keeps Next and Up next on one line.

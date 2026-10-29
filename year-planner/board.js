@@ -331,8 +331,23 @@ function todayIso() {
   return cellDate(now.getFullYear(), now.getMonth() + 1, now.getDate());
 }
 
+var holidayNames = Object.create(null);
+
+function indexHolidays(months) {
+  holidayNames = Object.create(null);
+  var years = Object.create(null);
+  months.forEach(function (month) { years[month.y] = true; });
+  Object.keys(years).forEach(function (key) {
+    Planner.holidaysForYear(+key).forEach(function (item) {
+      if (!holidayNames[item.date]) holidayNames[item.date] = [];
+      holidayNames[item.date].push(item.name);
+    });
+  });
+}
+
 function buildGrid() {
   var months = Planner.monthsInRange(RANGE_START, RANGE_END);
+  indexHolidays(months);
   var bar = document.createElement("div");
   bar.className = "dayhead-bar";
   var calendar = document.createElement("div");
@@ -429,6 +444,12 @@ function buildGrid() {
           letter.classList.add("today");
           var headDay = bar.querySelector('.daynum[data-day="' + d + '"]');
           if (headDay) headDay.classList.add("today");
+        }
+        if (holidayNames[iso]) {
+          var hol = document.createElement("span");
+          hol.className = "hol";
+          hol.setAttribute("aria-hidden", "true");
+          cell.append(hol);
         }
         cell.append(letter);
       }
@@ -832,7 +853,10 @@ function syncTips() {
       var detail = planWhenText(plan);
       return detail ? plan.title + " (" + detail + ")" : plan.title;
     });
-    cell.title = names.length ? when + " · " + names.join(", ") : when;
+    var bits = [when];
+    if (showHolidays && holidayNames[iso] && holidayNames[iso].length) bits.push(holidayNames[iso].join(", "));
+    if (names.length) bits.push(names.join(", "));
+    cell.title = bits.join(" · ");
   });
 }
 

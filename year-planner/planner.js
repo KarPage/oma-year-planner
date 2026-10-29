@@ -573,6 +573,103 @@ var Planner = (function () {
     return LETTERS[weekday(y, m, d)];
   }
 
+  function ymd(y, m, d) {
+    return y + "-" + pad(m) + "-" + pad(d);
+  }
+
+  /* Anonymous Gregorian computus. Month is 3 or 4. */
+  function easterSunday(year) {
+    var y = year | 0;
+    var a = y % 19;
+    var b = Math.floor(y / 100);
+    var c = y % 100;
+    var d = Math.floor(b / 4);
+    var e = b % 4;
+    var f = Math.floor((b + 8) / 25);
+    var g = Math.floor((b - f + 1) / 3);
+    var h = (19 * a + b - d - g + 15) % 30;
+    var i = Math.floor(c / 4);
+    var k = c % 4;
+    var l = (32 + 2 * e + 2 * i - h - k) % 7;
+    var m = Math.floor((a + 11 * h + 22 * l) / 451);
+    var month = Math.floor((h + l - 7 * m + 114) / 31);
+    var day = ((h + l - 7 * m + 114) % 31) + 1;
+    return ymd(y, month, day);
+  }
+
+  function nthWeekday(year, month, dow, n) {
+    var first = weekday(year, month, 1);
+    var day = 1 + (dow - first + 7) % 7 + (n - 1) * 7;
+    if (day < 1 || day > daysInMonth(year, month)) return "";
+    return ymd(year, month, day);
+  }
+
+  function lastWeekday(year, month, dow) {
+    var dim = daysInMonth(year, month);
+    var last = weekday(year, month, dim);
+    return ymd(year, month, dim - (last - dow + 7) % 7);
+  }
+
+  /* Saturday is observed Friday. Sunday is observed Monday. Weekdays stay put. */
+  function observedDate(iso) {
+    var parts = parse(iso);
+    if (!parts) return "";
+    var dow = weekday(parts.y, parts.m, parts.d);
+    if (dow === 6) return addDays(iso, -1);
+    if (dow === 0) return addDays(iso, 1);
+    return iso;
+  }
+
+  function pushHoliday(list, year, iso, name, kind) {
+    var parts = parse(iso);
+    if (!parts || parts.y !== year || !name) return;
+    var key = iso + "\n" + name;
+    if (list._seen[key]) return;
+    list._seen[key] = true;
+    list.push({ date: iso, name: name, kind: kind });
+  }
+
+  function addFederal(list, year, iso, name) {
+    pushHoliday(list, year, iso, name, "federal");
+    var observed = observedDate(iso);
+    if (observed && observed !== iso) pushHoliday(list, year, observed, name + " (observed)", "observed");
+  }
+
+  /* US federal holidays plus the common observances. No network. */
+  function holidaysForYear(year) {
+    var y = year | 0;
+    if (!(y >= 1 && y <= 9999)) return [];
+    var list = [];
+    list._seen = Object.create(null);
+    addFederal(list, y, ymd(y, 1, 1), "New Year's Day");
+    addFederal(list, y, ymd(y + 1, 1, 1), "New Year's Day");
+    pushHoliday(list, y, nthWeekday(y, 1, 1, 3), "MLK Day", "federal");
+    pushHoliday(list, y, nthWeekday(y, 2, 1, 3), "Presidents' Day", "federal");
+    pushHoliday(list, y, lastWeekday(y, 5, 1), "Memorial Day", "federal");
+    addFederal(list, y, ymd(y, 6, 19), "Juneteenth");
+    addFederal(list, y, ymd(y, 7, 4), "Independence Day");
+    pushHoliday(list, y, nthWeekday(y, 9, 1, 1), "Labor Day", "federal");
+    pushHoliday(list, y, nthWeekday(y, 10, 1, 2), "Columbus / Indigenous Peoples' Day", "federal");
+    addFederal(list, y, ymd(y, 11, 11), "Veterans Day");
+    pushHoliday(list, y, nthWeekday(y, 11, 4, 4), "Thanksgiving", "federal");
+    addFederal(list, y, ymd(y, 12, 25), "Christmas");
+    pushHoliday(list, y, ymd(y, 2, 14), "Valentine's Day", "observance");
+    pushHoliday(list, y, easterSunday(y), "Easter", "observance");
+    pushHoliday(list, y, nthWeekday(y, 5, 0, 2), "Mother's Day", "observance");
+    pushHoliday(list, y, nthWeekday(y, 6, 0, 3), "Father's Day", "observance");
+    pushHoliday(list, y, ymd(y, 10, 31), "Halloween", "observance");
+    pushHoliday(list, y, ymd(y, 12, 31), "New Year's Eve", "observance");
+    delete list._seen;
+    list.sort(function (a, b) {
+      if (a.date < b.date) return -1;
+      if (a.date > b.date) return 1;
+      if (a.name < b.name) return -1;
+      if (a.name > b.name) return 1;
+      return 0;
+    });
+    return list;
+  }
+
   function overlapsRange(plan, fromIso, toIso) {
     var start = plan.start;
     var end = plan.end < plan.start ? plan.start : plan.end;
@@ -1209,6 +1306,67 @@ var Planner = (function () {
     if (weekdayLetter(2026, 1, 1) !== "Thu") errors.push("jan 1 " + weekdayLetter(2026, 1, 1));
     if (daysInMonth(2026, 2) !== 28) errors.push("feb 2026");
     if (daysInMonth(2024, 2) !== 29) errors.push("feb 2024");
+    if (easterSunday(2024) !== "2024-03-31") errors.push("easter 2024 " + easterSunday(2024));
+    if (easterSunday(2025) !== "2025-04-20") errors.push("easter 2025 " + easterSunday(2025));
+    if (easterSunday(2026) !== "2026-04-05") errors.push("easter 2026 " + easterSunday(2026));
+    if (easterSunday(2027) !== "2027-03-28") errors.push("easter 2027 " + easterSunday(2027));
+    function expectHoliday(y, name, date) {
+      var found = holidaysForYear(y).filter(function (item) { return item.name === name; });
+      if (found.length !== 1 || found[0].date !== date) errors.push(name + " " + y + " " + JSON.stringify(found));
+    }
+    expectHoliday(2026, "New Year's Day", "2026-01-01");
+    expectHoliday(2026, "MLK Day", "2026-01-19");
+    expectHoliday(2026, "Valentine's Day", "2026-02-14");
+    expectHoliday(2026, "Presidents' Day", "2026-02-16");
+    expectHoliday(2026, "Easter", "2026-04-05");
+    expectHoliday(2026, "Mother's Day", "2026-05-10");
+    expectHoliday(2026, "Memorial Day", "2026-05-25");
+    expectHoliday(2026, "Juneteenth", "2026-06-19");
+    expectHoliday(2026, "Father's Day", "2026-06-21");
+    expectHoliday(2026, "Independence Day (observed)", "2026-07-03");
+    expectHoliday(2026, "Independence Day", "2026-07-04");
+    expectHoliday(2026, "Labor Day", "2026-09-07");
+    expectHoliday(2026, "Columbus / Indigenous Peoples' Day", "2026-10-12");
+    expectHoliday(2026, "Halloween", "2026-10-31");
+    expectHoliday(2026, "Veterans Day", "2026-11-11");
+    expectHoliday(2026, "Thanksgiving", "2026-11-26");
+    expectHoliday(2026, "Christmas", "2026-12-25");
+    expectHoliday(2026, "New Year's Eve", "2026-12-31");
+    expectHoliday(2027, "New Year's Day", "2027-01-01");
+    expectHoliday(2027, "MLK Day", "2027-01-18");
+    expectHoliday(2027, "Valentine's Day", "2027-02-14");
+    expectHoliday(2027, "Presidents' Day", "2027-02-15");
+    expectHoliday(2027, "Easter", "2027-03-28");
+    expectHoliday(2027, "Mother's Day", "2027-05-09");
+    expectHoliday(2027, "Memorial Day", "2027-05-31");
+    expectHoliday(2027, "Juneteenth (observed)", "2027-06-18");
+    expectHoliday(2027, "Juneteenth", "2027-06-19");
+    expectHoliday(2027, "Father's Day", "2027-06-20");
+    expectHoliday(2027, "Independence Day", "2027-07-04");
+    expectHoliday(2027, "Independence Day (observed)", "2027-07-05");
+    expectHoliday(2027, "Labor Day", "2027-09-06");
+    expectHoliday(2027, "Columbus / Indigenous Peoples' Day", "2027-10-11");
+    expectHoliday(2027, "Halloween", "2027-10-31");
+    expectHoliday(2027, "Veterans Day", "2027-11-11");
+    expectHoliday(2027, "Thanksgiving", "2027-11-25");
+    expectHoliday(2027, "Christmas (observed)", "2027-12-24");
+    expectHoliday(2027, "Christmas", "2027-12-25");
+    expectHoliday(2027, "New Year's Eve", "2027-12-31");
+    expectHoliday(2027, "New Year's Day (observed)", "2027-12-31");
+    function observedKey(year) {
+      return holidaysForYear(year).filter(function (item) { return item.kind === "observed"; }).map(function (item) {
+        return item.name + "@" + item.date;
+      }).sort().join("|");
+    }
+    if (observedKey(2026) !== "Independence Day (observed)@2026-07-03") errors.push("2026 observed " + observedKey(2026));
+    if (observedKey(2027) !== "Christmas (observed)@2027-12-24|Independence Day (observed)@2027-07-05|Juneteenth (observed)@2027-06-18|New Year's Day (observed)@2027-12-31") {
+      errors.push("2027 observed " + observedKey(2027));
+    }
+    if (holidaysForYear(2026).length !== 18) errors.push("2026 holiday count " + holidaysForYear(2026).length);
+    if (holidaysForYear(2027).length !== 21) errors.push("2027 holiday count " + holidaysForYear(2027).length);
+    if (daysAway(SAMPLE, 2026) !== 56) errors.push("holidays changed days away");
+    if (countTrips(SAMPLE) !== 10) errors.push("holidays changed trip count");
+    if (holidaysForYear(2026).some(function (item) { return item.start || item.type; })) errors.push("holiday is a plan");
     var dec = segmentsFor(
       { id: "x", title: "x", tag: "Trip", color: "#74a869", start: "2026-12-30", end: "2027-01-02" },
       2026
@@ -1767,6 +1925,9 @@ var Planner = (function () {
     daysInMonth: daysInMonth,
     weekday: weekday,
     weekdayLetter: weekdayLetter,
+    easterSunday: easterSunday,
+    observedDate: observedDate,
+    holidaysForYear: holidaysForYear,
     overlapsYear: overlapsYear,
     overlapsRange: overlapsRange,
     daysAway: daysAway,

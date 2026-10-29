@@ -166,7 +166,8 @@ h1.today-headline {
 }
 #full-btn svg { display: block; }
 #full-btn .full-collapse { display: none; }
-#full-btn.is-full {
+#full-btn.is-full,
+#hol-btn[aria-pressed="true"] {
   border-color: var(--accent);
   color: var(--accent);
 }
@@ -282,6 +283,7 @@ h1.today-headline {
   color: var(--muted);
 }
 #gcal-connect,
+#hol-btn,
 #pin-desk {
   display: inline-flex;
   align-items: center;
@@ -290,6 +292,7 @@ h1.today-headline {
   line-height: 0;
   gap: 0;
 }
+#hol-btn svg,
 #pin-desk svg { width: 16px; height: 16px; display: block; flex: none; }
 #pin-desk .pin-head { fill: none; }
 #pin-desk[aria-pressed="true"] .pin-head { fill: currentColor; }
@@ -1072,6 +1075,22 @@ label.search input::placeholder {
   background: color-mix(in srgb, var(--bg-deep) 72%, transparent);
   cursor: default;
 }
+.hol {
+  position: absolute;
+  z-index: 4;
+  top: 0;
+  left: 50%;
+  width: 8px;
+  height: 2px;
+  margin-left: -4px;
+  background: color-mix(in srgb, var(--accent) 80%, var(--bg));
+  pointer-events: none;
+  border-radius: 0;
+}
+.cell.past .hol {
+  background: color-mix(in srgb, var(--fg) 28%, var(--bg));
+}
+body:not(.show-holidays) .hol { display: none; }
 .wd {
   z-index: 3;
   align-self: start;
@@ -1968,6 +1987,7 @@ textarea {
   color: var(--accent);
 }
 #keys-btn:hover, #keys-btn:focus-visible,
+#hol-btn:hover, #hol-btn:focus-visible,
 #full-btn:hover, #pin-desk:hover, #pin-desk:focus-visible {
   border-color: var(--accent);
   color: var(--accent);

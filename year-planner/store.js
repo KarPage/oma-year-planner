@@ -48,6 +48,13 @@ var year = (function () {
   if (stored >= 1970 && stored <= 2100) return stored;
   return new Date().getFullYear();
 })();
+var showHolidays = (function () {
+  try {
+    var raw = JSON.parse(localStorage.getItem(STORAGE_KEY) || "null");
+    if (raw && raw.showHolidays === false) return false;
+  } catch (err) { /* a broken save keeps the default, which is on */ }
+  return true;
+})();
 var plans = load();
 var imagesById = Object.create(null);
 var editingId = null;
@@ -201,8 +208,32 @@ function plansHaveImages(list) {
   return false;
 }
 
+function holidayPayload(raw) {
+  var doc = raw && typeof raw === "object" && Array.isArray(raw.plans) ? raw : { version: 1, plans: plans.map(storedPlan) };
+  if (showHolidays) delete doc.showHolidays;
+  else doc.showHolidays = false;
+  return doc;
+}
+
+function persistHolidayPref() {
+  try {
+    var raw = JSON.parse(localStorage.getItem(STORAGE_KEY) || "null");
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(holidayPayload(raw)));
+  } catch (err) { /* private mode keeps the choice for this visit */ }
+}
+
+function paintHolidayToggle() {
+  document.body.classList.toggle("show-holidays", showHolidays);
+  var button = document.getElementById("hol-btn");
+  if (!button) return;
+  button.setAttribute("aria-pressed", showHolidays ? "true" : "false");
+  var label = showHolidays ? "Hide holidays" : "Show holidays";
+  button.setAttribute("aria-label", label);
+  button.title = label;
+}
+
 function save() {
-  var payload = JSON.stringify({ version: 1, plans: plans.map(storedPlan) });
+  var payload = JSON.stringify(holidayPayload(null));
   var previous;
   try {
     previous = localStorage.getItem(STORAGE_KEY);
@@ -963,3 +994,4 @@ document.getElementById("import-ics-file").addEventListener("change", function (
 
 var minuteTimer = 0;
 var midnightTimer = 0;
+paintHolidayToggle();

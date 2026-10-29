@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- US holidays are a small tick on the day. The eleven federal holidays follow the usual weekday rules, and a fixed date that falls on a weekend also marks the observed Friday or Monday. Valentine's Day, Easter, Mother's Day, Father's Day, Halloween, and New Year's Eve are included. Hover shows the name. Holidays are not plans and are not counted as days away. The header button hides them. The choice is saved with the plans and starts on.
 - Plan names sit in the widest free stretch of the bar, clear of single-day chips. Short bars still end in an ellipsis, and the day count drops before the name does.
 - Selecting a plan highlights the bar itself. The note shows the name, the date range, how many days it covers, whether it is coming up, in progress, or over, and the type. The note is shown only when the plan has one. Edit and delete stay on the card, and double-click still opens the editor.
 - The full-screen button follows the real window state. The bar menu, the F key, F11, and the header button all leave full screen, and the button label matches.
