@@ -18,7 +18,7 @@
     })();
   </script>
 </head>
-<body>
+<body class="show-holidays">
   <header class="top">
     <div class="brand">
       <svg class="mark" viewBox="0 0 28 28" aria-hidden="true">
@@ -54,6 +54,12 @@
       </button>
       <button class="ghost gcal-chip" id="gcal-reconnect" type="button" hidden>Reconnect Google</button>
       <div class="util">
+      <button class="icon-btn" id="hol-btn" type="button" aria-pressed="true" aria-label="Hide holidays" title="Hide holidays">
+        <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
+          <rect x="2.5" y="3.5" width="11" height="10" fill="none" stroke="currentColor" stroke-width="1.3"/>
+          <path d="M2.5 6.5h11M5.5 2.5v2M10.5 2.5v2M5.5 9.25h5" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="square"/>
+        </svg>
+      </button>
       <button class="icon-btn" id="keys-btn" type="button" aria-label="Help and shortcuts" title="Help and shortcuts">
         <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
           <rect x="1" y="3.5" width="14" height="9" fill="none" stroke="currentColor" stroke-width="1.3"/>

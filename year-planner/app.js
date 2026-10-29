@@ -47,6 +47,12 @@ document.getElementById("help").addEventListener("close", function () {
   try { localStorage.setItem(WELCOME_KEY, "1"); } catch (err) { /* private mode */ }
 });
 
+document.getElementById("hol-btn").addEventListener("click", function () {
+  showHolidays = !showHolidays;
+  paintHolidayToggle();
+  persistHolidayPref();
+  syncTips();
+});
 document.getElementById("keys-btn").addEventListener("click", function () {
   openHelp("shortcuts");
 });

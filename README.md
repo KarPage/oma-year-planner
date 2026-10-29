@@ -15,6 +15,7 @@
 - **Fast planning.** Click a day to open quick add, name the plan, attach a photo, and pick Plan or Trip. Drag the handle to extend the range. Drag a bar to move a plan, or drag its ends to resize it.
 - **Thin month-wrap bars.** A plan that crosses a month stays one thin strip. It fades out at the end of the row and fades back in on the next, and the name stays on the longer piece.
 - **Trips, events and reminders.** One-day plans show as small markers. Trips add up to a "days away" count per month and for the year.
+- **US holidays.** A small tick marks federal holidays and a few common days (Valentine's Day, Easter, Mother's Day, Father's Day, Halloween, New Year's Eve). Hover shows the name. They are not plans and they are not counted in days away. The calendar button in the header hides them. The choice is saved with your plans and starts on.
 - **Dashboard strip.** Counts for plans, trips and days away, then Next, Up next and Last. A wide window shows three Upcoming plans. A narrow window keeps Next, Up next and Last on one line.
 - **Time and place.** A plan can be all day or have a start and end time, plus an optional place. The place opens in Maps only when you click it. Times and places go along with calendar files and Google Calendar.
 - **Notes, links, checklists and up to four images per plan.** Checklist progress shows on the bar, for example `Canada · 8d · 3/7`.
